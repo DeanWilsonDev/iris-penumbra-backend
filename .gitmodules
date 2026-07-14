@@ -1,0 +1,6 @@
+[submodule "vendor/iris"]
+	path = vendor/iris
+	url = https://github.com/DeanWilsonDev/iris.git
+[submodule "vendor/penumbra"]
+	path = vendor/penumbra
+	url = https://github.com/DeanWilsonDev/penumbra-proto.git
