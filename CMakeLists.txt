@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(IrisPenumbraBackend
     VERSION 0.1.0
-    DESCRIPTION "The Penumbra backend for Iris — maps IrisComponent IR onto a real Penumbra widget tree"
+    DESCRIPTION "The Penumbra backend for Iris and Lustre — maps IrisComponent IR onto a real Penumbra widget tree and applies Lustre::ResolvedStyle to it"
     LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)

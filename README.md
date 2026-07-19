@@ -1,19 +1,36 @@
-# iris-penumbra-backend
+# penumbra-ui-backend
 
-The Penumbra backend for [Iris](https://github.com/DeanWilsonDev/iris): the code that walks a
-parsed, props-resolved `IrisComponent` IR tree and builds a real
-[Penumbra](https://github.com/DeanWilsonDev/penumbra-proto) widget tree from it, via Penumbra's
-fluent `Builder` API (`Box::Builder`, `Label::Builder`, etc.).
+> **Renamed from `iris-penumbra-backend`.** The old name only mentioned Iris, but this repo now
+> also bridges [Lustre](https://github.com/DeanWilsonDev/lustre)'s resolved styles into Penumbra
+> (see "The Lustre style bridge" below) — the name is now target-first (what it builds *for*,
+> Penumbra) rather than source-first (what it builds *from*), so a future analogous repo for a
+> different rendering target (e.g. an Umbra Engine-backed one) doesn't need "and lustre and
+> whatever comes after it" bolted onto its name too. GitHub redirects the old URL automatically.
+> **Known follow-up, not yet done:** the C++ namespace (`IrisPenumbraBackend::`) and CMake target
+> names (`iris_penumbra_backend*`) throughout this repo still reflect the old name — renaming
+> those is a larger, separate change touching every source file and wasn't bundled into the repo
+> rename itself.
+
+The Penumbra backend for [Iris](https://github.com/DeanWilsonDev/iris) and
+[Lustre](https://github.com/DeanWilsonDev/lustre): the code that walks a parsed,
+props-resolved `IrisComponent` IR tree and builds a real
+[Penumbra](https://github.com/DeanWilsonDev/penumbra-proto) widget tree from it via Penumbra's
+fluent `Builder` API (`Box::Builder`, `Label::Builder`, etc.), and applies Lustre's resolved
+styles onto that same real widget tree.
 
 ## Why this is a separate repo
 
-Iris's core (preprocessor + IR + runtime library) is backend-agnostic by design — it's meant to
-support more than one backend over time (Penumbra now, an Umbra Engine/Nyx backend deferred).
-Penumbra is a general-purpose retained-mode widget library with no inherent reason to know Iris
-exists either. Neither should have to pull in the other's build just to compile on its own, so
-the code that bridges them — this repo — is its own thing: it vendors both `iris` and
-`penumbra-proto` as git submodules and depends on both, while neither of them depends on it or
-on each other.
+Iris's core (preprocessor + IR + runtime library) and Lustre's core (parser + cascade/selector
+resolver) are both backend-agnostic by design — each is meant to support more than one backend
+over time (Penumbra now, an Umbra Engine/Nyx backend deferred), and neither knows the other
+exists: Iris doesn't know Lustre exists, and Lustre doesn't know Iris exists. Penumbra itself is
+a general-purpose retained-mode widget library with no inherent reason to know either exists.
+None of the three should have to pull in another's build just to compile on its own, so the code
+that bridges them all — this repo — is its own thing: it vendors `iris`, `lustre`, and
+`penumbra-proto` as git submodules and depends on all three, while none of them depend on it or
+on each other. See `docs/iris_penumbra_backend_lustre_bridge_decision.md` for the fuller
+reasoning behind keeping Iris and Lustre decoupled even here, and why this stayed one repo
+instead of splitting into a separate Lustre-specific bridge.
 
 ## Status
 
