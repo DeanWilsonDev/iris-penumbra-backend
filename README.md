@@ -34,7 +34,7 @@ Mapping (`docs/iris_core_spec.md` §3.1, cross-checked against the real Penumbra
 | `Grid` | `Box` (`LayoutMode::HorizontalStack`) | stub — Penumbra has no real grid layout yet |
 | `Image` | `ImageWidget` | leaf; `LoadFrom()` called separately via `BuildContext` |
 | `Text` | `Label` | `FontBackend`/`Font` set from `BuildContext` (no Builder method for either) |
-| `Slot` | never reaches this walker | the Iris runtime resolves every `<Slot>` first |
+| `Slot` | `nullptr` during this static build | see "`<Slot>` wiring" below — resolved separately, afterward |
 | `None` | `nullptr` | the `<Slot>`-returned-`nullptr` sentinel — "no widget here" |
 
 `BuildContext` (`Walker.h`) carries the resources Penumbra's own `Builder`s don't expose: a
@@ -69,6 +69,19 @@ AddressSanitizer. Fixed there via `IRIS_SIGNAL(Type, Name, InitExpr)`
 (`iris`'s `docs/iris_signal_lifetime_decision.md`) — state declarations now bind to
 heap-allocated storage instead of a stack local. Re-verified end to end against this repo's own
 real Penumbra widgets under AddressSanitizer with zero errors after the bump.
+
+**`<Slot>` is now wired in, for the single-`IrisComponent`-returning case**: `BuildWidgetTree`
+treats a `<Slot>` child exactly like `None` during the static build (contributes nothing); a
+new `iris::ResolveSlots()` (`iris`'s `include/Iris/SlotResolution.h`) then walks the just-built
+tree and the source `IrisComponent` tree in lockstep, and for each `<Slot>` found, attaches a
+`SlotState` to its exact position and performs its initial mount. Every subsequent
+`iris::Tick()`-triggered reconcile updates that same real position in place — pure
+`Umbra::IWidget`, so this logic is entirely backend-agnostic and lives in `iris`'s own runtime;
+the only change needed here was `BuildWidgetTree`'s own `Slot` case. Verified against real
+`Box`/`Label` objects, not a mock: a live `iris::Signal` update reaching a real
+`Box::Children` vector end to end, including under AddressSanitizer with zero errors
+(`tests/SlotWiringTests.cpp`). Full design and what's still deliberately deferred (list-returning
+`<Slot>`s, nested `<Slot>` discovery): `iris`'s `docs/iris_slot_stage2_wiring_decision.md`.
 
 ## Build
 

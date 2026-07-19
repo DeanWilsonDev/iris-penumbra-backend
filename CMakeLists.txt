@@ -41,7 +41,8 @@ target_link_libraries(iris_penumbra_backend PUBLIC iris penumbra)
 # ---------------------------------------------------------------------------
 add_executable(iris_penumbra_backend_tests
     tests/WalkerTests.cpp
-    tests/PenumbraWidgetAdapterTests.cpp)
+    tests/PenumbraWidgetAdapterTests.cpp
+    tests/SlotWiringTests.cpp)
 
 target_link_libraries(iris_penumbra_backend_tests PRIVATE iris_penumbra_backend)
 set_target_properties(iris_penumbra_backend_tests PROPERTIES

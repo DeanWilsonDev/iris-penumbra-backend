@@ -36,17 +36,21 @@ struct BuildContext {
 // repo), but this function never reads it; matching by key across two trees is Stage 3's
 // reconciler's job (`PenumbraWidgetAdapter.h`), built on top of this, not part of it.
 //
-// Two IrisElementTag values get special handling rather than a Builder call:
+// Two IrisElementTag values get special handling rather than a Builder call, and both
+// return `nullptr` — "no widget here, contributes nothing to its parent's built
+// children," not an error:
 //   - `None` (the `<Slot>`-callable-returned-`nullptr` sentinel, docs/iris_core_spec.md
-//     §8) returns `nullptr` — "no widget here", not an error. A `None` child is simply
-//     omitted from its parent's built children, never passed to a child()/children()
-//     Builder call.
-//   - `Slot` should never reach this function at all: the Iris runtime is specified to
-//     resolve every `<Slot>` (invoking its callable, substituting the result) before
-//     any backend-mapping pass runs (docs/iris_core_spec.md §2.5). Encountering one
-//     here is a precondition violation, not a normal "no widget" case — asserts in
-//     debug builds, returns `nullptr` in release ones (same fallback as `None`, since
-//     there's nothing sound to build).
+//     §8).
+//   - `Slot` (docs/iris_slot_stage2_wiring_decision.md) — a `<Slot>` child's own
+//     content isn't known yet at this point in the build (its callable hasn't been
+//     invoked), so this function leaves its position empty, same as `None`. The real
+//     content gets spliced in afterward by `iris::ResolveSlots`
+//     (`Iris/SlotResolution.h`, in the `iris` repo), which walks the just-built static
+//     tree and `Node`'s own `IrisComponent` tree in lockstep to find each `<Slot>`'s
+//     correct position and attach its initial (and, later, every subsequent) render
+//     there. A `<Slot>` at the very root of what's being built (no static wrapper at
+//     all, e.g. `render { <Slot>...</Slot> }`) is a different case `ResolveSlots`
+//     doesn't handle either — see its own doc comment for what to do instead.
 std::unique_ptr<Penumbra::Widgets::WidgetBase> BuildWidgetTree(const Iris::IrisComponent& Node,
                                                                  const BuildContext&        Context);
 

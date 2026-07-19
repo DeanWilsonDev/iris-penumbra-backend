@@ -5,7 +5,6 @@
 #include "Penumbra/Widgets/InlineContainer.h"
 #include "Penumbra/Widgets/Label.h"
 
-#include <cassert>
 #include <optional>
 #include <string>
 #include <variant>
@@ -158,10 +157,14 @@ std::unique_ptr<WidgetBase> BuildWidgetTree(const IrisComponent& Node, const Bui
         case IrisElementTag::None:
             return nullptr;
         case IrisElementTag::Slot:
-            assert(false &&
-                   "BuildWidgetTree encountered an unresolved <Slot> — the Iris runtime must resolve every "
-                   "<Slot> (invoke its callable, substitute the result) before any backend-mapping pass runs "
-                   "(docs/iris_core_spec.md §2.5). This is a precondition violation, not a normal case.");
+            // Contributes nothing during this static build, same as None — a <Slot>
+            // child is spliced in afterward by iris::ResolveSlots (Iris/SlotResolution.h,
+            // docs/iris_slot_stage2_wiring_decision.md), which needs the surrounding
+            // static tree to already exist (with the Slot's own position simply absent)
+            // before it can attach real content there. A <Slot> that's the very ROOT of
+            // what's being built (no static wrapper at all) is a different case, handled
+            // by the caller via a plain, unattached iris::SlotState instead — see that
+            // decision doc.
             return nullptr;
         case IrisElementTag::Frame:
             return BuildFrame(Node, Context);
