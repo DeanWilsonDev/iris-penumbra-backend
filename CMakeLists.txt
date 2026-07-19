@@ -25,13 +25,22 @@ add_subdirectory(vendor/penumbra)
 # fluent Builder API (from `penumbra`) — docs/iris_core_spec.md §2.5–§2.6,
 # §3 on the `iris` side; `docs/iris_stage2_decision_doc.md` for the Stage 2
 # planning decisions this implements.
-#
-# No sources yet: the concrete walker needs `IrisProps`'s runtime
-# representation decided first (how prop values — strings, ints, event
-# lambdas — are actually stored on an IrisComponent node), which is a real
-# open design question Iris's own spec deliberately leaves open. This
-# target exists now so the dependency wiring (link against both `iris` and
-# `penumbra`) is correct and ready for that code once it's designed.
 # ---------------------------------------------------------------------------
-add_library(iris_penumbra_backend INTERFACE)
-target_link_libraries(iris_penumbra_backend INTERFACE iris penumbra)
+add_library(iris_penumbra_backend STATIC
+    src/IrisPenumbraBackend/Walker.cpp)
+
+target_include_directories(iris_penumbra_backend PUBLIC include)
+target_compile_features(iris_penumbra_backend PUBLIC cxx_std_23)
+target_link_libraries(iris_penumbra_backend PUBLIC iris penumbra)
+
+# ---------------------------------------------------------------------------
+# Tests — plain hand-rolled Expect()/[PASS]/[FAIL] executable, matching
+# `iris`'s own test style (Cimmerian, the ecosystem's intended long-term test
+# framework, isn't wired into either repo yet).
+# ---------------------------------------------------------------------------
+add_executable(iris_penumbra_backend_tests
+    tests/WalkerTests.cpp)
+
+target_link_libraries(iris_penumbra_backend_tests PRIVATE iris_penumbra_backend)
+set_target_properties(iris_penumbra_backend_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")

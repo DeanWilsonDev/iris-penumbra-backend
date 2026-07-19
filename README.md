@@ -17,13 +17,38 @@ on each other.
 
 ## Status
 
-This is Stage 2 of Iris's roadmap (see `iris`'s `docs/iris_handoff.md` §6). The dependency
-wiring is in place (`CMakeLists.txt` links an `iris_penumbra_backend` target against both `iris`
-and `penumbra`), but the walker itself has no sources yet — it needs `IrisProps`'s concrete
-runtime representation decided first (how heterogeneous prop values: strings, ints, event
-lambdas, are actually stored on an `IrisComponent` node), which `iris`'s own spec
-(`docs/iris_core_spec.md` §2.5) deliberately leaves open rather than inventing an answer as a
-side effect of unrelated work.
+This is Stage 2 of Iris's roadmap (see `iris`'s `docs/iris_handoff.md` §6). The walker is
+implemented: `IrisPenumbraBackend::BuildWidgetTree()` (`include/IrisPenumbraBackend/Walker.h`)
+takes a single `IrisComponent` IR node and recursively builds the equivalent real Penumbra
+widget tree via each Core primitive's own fluent `Builder`. It's a one-shot tree build only —
+no diffing, no identity tracking (`key` never reaches `IrisComponent`; it's stripped by Iris's
+preprocessor before codegen, so there's nothing here for a `key`-based live-widget map to key
+off of — that's a Stage 3 reconciler concern layered on top of this, not part of it).
+
+Mapping (`docs/iris_core_spec.md` §3.1, cross-checked against the real Penumbra source):
+
+| `IrisElementTag` | Penumbra widget | Notes |
+| --- | --- | --- |
+| `Frame` | `Box` | via `Box::Builder` |
+| `Inline` | `InlineContainer` | real wrapping inline-flow, distinct from `Text`/`Label` |
+| `Grid` | `Box` (`LayoutMode::HorizontalStack`) | stub — Penumbra has no real grid layout yet |
+| `Image` | `ImageWidget` | leaf; `LoadFrom()` called separately via `BuildContext` |
+| `Text` | `Label` | `FontBackend`/`Font` set from `BuildContext` (no Builder method for either) |
+| `Slot` | never reaches this walker | the Iris runtime resolves every `<Slot>` first |
+| `None` | `nullptr` | the `<Slot>`-returned-`nullptr` sentinel — "no widget here" |
+
+`BuildContext` (`Walker.h`) carries the resources Penumbra's own `Builder`s don't expose: a
+font backend/handle for `Label`, and an image backend/SDL renderer for `ImageWidget::LoadFrom`.
+Both are optional — a widget still builds successfully with either left null, useful for
+structural tests that don't need a real font/SDL context.
+
+Verified against the full pipeline, not just in isolation: a real `.iris` component
+(`HealthBar`, with a `<Frame class="...">` wrapping a `<Text>{props.label}</Text>`) compiled
+through `iris`'s own `iris_cc` CLI, `#include`d, called, and the resulting `IrisComponent` fed
+through `BuildWidgetTree` — producing a real `Box`/`Label` tree with the class name, child
+count, and interpolated text all correct. See `tests/WalkerTests.cpp` for the structural test
+suite (`IrisElementTag::None` skipping, event-prop wiring, the `<Grid>` stub, nested recursion,
+etc.).
 
 ## Build
 
@@ -31,4 +56,5 @@ side effect of unrelated work.
 git submodule update --init --recursive
 cmake -S . -B build
 cmake --build build
+./build/tests/iris_penumbra_backend_tests
 ```
