@@ -70,18 +70,23 @@ AddressSanitizer. Fixed there via `IRIS_SIGNAL(Type, Name, InitExpr)`
 heap-allocated storage instead of a stack local. Re-verified end to end against this repo's own
 real Penumbra widgets under AddressSanitizer with zero errors after the bump.
 
-**`<Slot>` is now wired in, for the single-`IrisComponent`-returning case**: `BuildWidgetTree`
-treats a `<Slot>` child exactly like `None` during the static build (contributes nothing); a
-new `iris::ResolveSlots()` (`iris`'s `include/Iris/SlotResolution.h`) then walks the just-built
-tree and the source `IrisComponent` tree in lockstep, and for each `<Slot>` found, attaches a
-`SlotState` to its exact position and performs its initial mount. Every subsequent
-`iris::Tick()`-triggered reconcile updates that same real position in place — pure
-`Umbra::IWidget`, so this logic is entirely backend-agnostic and lives in `iris`'s own runtime;
-the only change needed here was `BuildWidgetTree`'s own `Slot` case. Verified against real
-`Box`/`Label` objects, not a mock: a live `iris::Signal` update reaching a real
-`Box::Children` vector end to end, including under AddressSanitizer with zero errors
-(`tests/SlotWiringTests.cpp`). Full design and what's still deliberately deferred (list-returning
-`<Slot>`s, nested `<Slot>` discovery): `iris`'s `docs/iris_slot_stage2_wiring_decision.md`.
+**`<Slot>` is now wired in, for both callable shapes**: `BuildWidgetTree` treats a `<Slot>` child
+exactly like `None` during the static build (contributes nothing); a new `iris::ResolveSlots()`
+(`iris`'s `include/Iris/SlotResolution.h`) then walks the just-built tree and the source
+`IrisComponent` tree in lockstep, and for each `<Slot>` found, attaches a `SlotState` to its
+exact position and performs its initial mount. A `SlotSiblingGroup` shared by every `<Slot>`
+sibling under the same static parent recomputes each slot's absolute position fresh on every
+reconcile, so a list-returning `<Slot>`'s own growth/shrinkage (and a sibling toggling to/from
+`None`) correctly shifts whatever comes after it. Every subsequent `iris::Tick()`-triggered
+reconcile updates the real position(s) in place — pure `Umbra::IWidget`, so this logic is
+entirely backend-agnostic and lives in `iris`'s own runtime; the only change needed here was
+`BuildWidgetTree`'s own `Slot` case. Verified against real `Box`/`Label` objects, not a mock: a
+live `iris::Signal` update reaching a real `Box::Children` vector end to end, including under
+AddressSanitizer + UndefinedBehaviorSanitizer with zero errors (`tests/SlotWiringTests.cpp` here;
+`iris`'s own `tests/SlotResolutionTests.cpp` and `tests/cimmerian/SlotSiblingGroupTests.cpp`
+cover the list-sibling cases directly). Still deliberately deferred: nested `<Slot>` discovery.
+Full design: `iris`'s `docs/iris_slot_stage2_wiring_decision.md` and
+`docs/iris_slot_list_wiring_decision.md`.
 
 ## Build
 

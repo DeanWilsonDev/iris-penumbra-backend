@@ -104,10 +104,12 @@ AddressSanitizer, completes with zero errors.
 
 - **`Handle`/`Checked` prop diffing** — no-op today (see the table above); revisit once
   either has a real Core-primitive path to it.
-- **Wiring a `<Slot>`'s own root widget into the static tree above it.** Nothing yet
-  calls `MakeMountFn`/`SlotState` from Stage 2's `BuildWidgetTree` when it encounters a
-  `<Slot>` tag — that walker still asserts on one. This adapter makes that wiring
-  *possible*; it doesn't do the wiring itself.
 - **Nested `<Slot>` discovery** — unchanged from `docs/iris_stage3_implementation_
   decision.md`: `SlotState` still assumes the trees its callable produces contain no
   further `<Slot>` tags of their own.
+
+**Done, since this doc was written:** wiring a `<Slot>`'s own root widget into the
+static tree above it — `MakeMountFn`/`SlotState` are now driven from Stage 2's
+`BuildWidgetTree` via `iris::ResolveSlots`, for both the single-`IrisComponent`- and
+list-returning callable shapes. See the README's own `<Slot>` wiring section and `iris`'s
+`docs/iris_slot_stage2_wiring_decision.md`/`docs/iris_slot_list_wiring_decision.md`.
