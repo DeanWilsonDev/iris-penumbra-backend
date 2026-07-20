@@ -6,6 +6,8 @@
 #include "Penumbra/Widgets/ImageWidget.h"
 #include "Penumbra/Widgets/InlineContainer.h"
 #include "Penumbra/Widgets/Label.h"
+#include "Penumbra/Widgets/ScrollablePanel.h"
+#include "Penumbra/Widgets/TextInput.h"
 
 #include <cstdio>
 #include <string>
@@ -35,6 +37,8 @@ using Penumbra::Widgets::ImageWidget;
 using Penumbra::Widgets::InlineContainer;
 using Penumbra::Widgets::Label;
 using Penumbra::Widgets::LayoutMode;
+using Penumbra::Widgets::ScrollablePanel;
+using Penumbra::Widgets::TextInput;
 using Penumbra::Widgets::WidgetBase;
 
 Component MakeNode(IrisElementTag Tag, IrisProps Props = {}, std::vector<Component> Children = {}) {
@@ -190,6 +194,65 @@ void TestIconWithNoSizePropKeepsTheDefault() {
            "an absent size prop leaves IconWidget::SizeLogical at its own default (Builder::size() never called)");
 }
 
+void TestScrollBuildsAScrollablePanelWithChildrenAndWheelStep() {
+    std::vector<Component> RowChildren;
+    RowChildren.push_back(MakeNode(IrisElementTag::Frame));
+    RowChildren.push_back(MakeNode(IrisElementTag::Frame));
+
+    IrisProps Props;
+    Props["wheelStep"] = IrisPropValue{24.0f};
+    const auto Node = MakeNode(IrisElementTag::Scroll, Props, RowChildren);
+
+    const auto Built = BuildWidgetTree(Node, BuildContext{});
+    const auto* AsScroll = dynamic_cast<ScrollablePanel*>(Built.get());
+    Expect(AsScroll != nullptr, "<Scroll> builds a ScrollablePanel");
+    Expect(AsScroll != nullptr && AsScroll->WheelStepLogical == 24.0f,
+           "the wheelStep prop reaches ScrollablePanel::WheelStepLogical");
+    Expect(AsScroll != nullptr && AsScroll->GetChildCount() == 2,
+           "both element children were attached via AddChild");
+}
+
+void TestScrollWithNoWheelStepKeepsTheDefault() {
+    const auto Node = MakeNode(IrisElementTag::Scroll);
+    const auto Built = BuildWidgetTree(Node, BuildContext{});
+    const auto* AsScroll = dynamic_cast<ScrollablePanel*>(Built.get());
+    Expect(AsScroll != nullptr && AsScroll->WheelStepLogical == 0.0f,
+           "an absent wheelStep prop leaves ScrollablePanel::WheelStepLogical at its own default");
+}
+
+void TestInputBuildsATextInputWithTextAndPreferredWidth() {
+    IrisProps Props;
+    Props["text"] = IrisPropValue{std::string("hello")};
+    Props["preferredWidth"] = IrisPropValue{200.0f};
+    const auto Node = MakeNode(IrisElementTag::Input, Props);
+
+    const auto Built = BuildWidgetTree(Node, BuildContext{});
+    const auto* AsInput = dynamic_cast<TextInput*>(Built.get());
+    Expect(AsInput != nullptr, "<Input> builds a TextInput");
+    Expect(AsInput != nullptr && AsInput->Text == "hello", "the text prop reaches TextInput::Text");
+    Expect(AsInput != nullptr && AsInput->PreferredWidthLogical == 200.0f,
+           "the preferredWidth prop reaches TextInput::PreferredWidthLogical");
+    Expect(AsInput != nullptr && AsInput->Focus == nullptr && AsInput->Clipboard == nullptr,
+           "TextInput::Focus/Clipboard stay null when BuildContext supplies neither -- still built, just inert");
+}
+
+void TestInputPicksUpFocusAndClipboardFromBuildContext() {
+    Penumbra::Widgets::FocusState  Focus;
+    struct FakeClipboard : Penumbra::Platform::IClipboard {
+        void        SetClipboardText(const std::string&) override {}
+        std::string GetClipboardText() const override { return {}; }
+    } Clipboard;
+
+    const auto Node = MakeNode(IrisElementTag::Input);
+    BuildContext Context;
+    Context.Focus = &Focus;
+    Context.Clipboard = &Clipboard;
+    const auto Built = BuildWidgetTree(Node, Context);
+    const auto* AsInput = dynamic_cast<TextInput*>(Built.get());
+    Expect(AsInput != nullptr && AsInput->Focus == &Focus && AsInput->Clipboard == &Clipboard,
+           "TextInput::Focus/Clipboard are populated from BuildContext");
+}
+
 void TestNestedTreeBuildsRecursively() {
     // <Frame class="party-row"><HealthBar-shaped Frame/></Frame> — a small stand-in for
     // the spec §9 PartyScreen shape, since <HealthBar> itself is a component invocation
@@ -230,6 +293,10 @@ void RunWalkerTests() {
     TestIconPicksUpIconBackendFromBuildContext();
     TestIconSizeOverridesTheDefault();
     TestIconWithNoSizePropKeepsTheDefault();
+    TestScrollBuildsAScrollablePanelWithChildrenAndWheelStep();
+    TestScrollWithNoWheelStepKeepsTheDefault();
+    TestInputBuildsATextInputWithTextAndPreferredWidth();
+    TestInputPicksUpFocusAndClipboardFromBuildContext();
     TestNestedTreeBuildsRecursively();
 }
 

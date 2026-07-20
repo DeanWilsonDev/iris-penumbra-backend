@@ -6,7 +6,9 @@
 #include "Iris/Component.h"
 #include "Penumbra/Backends/IIconBackend.h"
 #include "Penumbra/Backends/IImageBackend.h"
+#include "Penumbra/Platform/IClipboard.h"
 #include "Penumbra/Render/IFontBackend.h"
+#include "Penumbra/Widgets/FocusState.h"
 #include "Penumbra/Widgets/WidgetBase.h"
 
 #include <SDL3/SDL.h>
@@ -52,6 +54,13 @@ struct BuildContext {
     Penumbra::Backends::IImageBackend* ImageBackend{nullptr};
     Penumbra::Backends::IIconBackend*  IconBackend{nullptr};
     SDL_Renderer*                      SdlRenderer{nullptr};
+    // <Input> (docs/iris_core_spec.md §3.1) -- app-owned runtime state a built
+    // TextInput needs to actually be focusable/editable. Left null means the
+    // same "build succeeds, nothing loaded" tolerance ImageBackend/IconBackend
+    // already have: the widget still builds, it's just inert (unfocusable, no
+    // clipboard) until a caller wires these up.
+    Penumbra::Widgets::FocusState*  Focus{nullptr};
+    Penumbra::Platform::IClipboard* Clipboard{nullptr};
 
     const ::Lustre::StylesheetSet* Style{nullptr};
     const Lustre::IStyleApplier*    StyleApplier{nullptr};

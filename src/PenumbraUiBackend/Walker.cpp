@@ -7,6 +7,8 @@
 #include "Penumbra/Widgets/ImageWidget.h"
 #include "Penumbra/Widgets/InlineContainer.h"
 #include "Penumbra/Widgets/Label.h"
+#include "Penumbra/Widgets/ScrollablePanel.h"
+#include "Penumbra/Widgets/TextInput.h"
 
 #include <optional>
 #include <string>
@@ -24,6 +26,8 @@ using Penumbra::Widgets::IconWidget;
 using Penumbra::Widgets::ImageWidget;
 using Penumbra::Widgets::InlineContainer;
 using Penumbra::Widgets::Label;
+using Penumbra::Widgets::ScrollablePanel;
+using Penumbra::Widgets::TextInput;
 using Penumbra::Widgets::WidgetBase;
 
 std::optional<std::string> GetStringProp(const IrisProps& Props, const std::string& Name) {
@@ -59,6 +63,34 @@ std::optional<std::function<void()>> GetEventProp(const IrisProps& Props, const 
     return std::nullopt;
 }
 
+// <Scroll>/<Input> both build to a WidgetBase subclass with no Builder of its own
+// (ScrollablePanel.h/TextInput.h -- unlike every other Core primitive here). Shared
+// props (class, event props) are WidgetBase's own plain public fields
+// (docs/iris_core_spec.md §3.1's `<Icon>` entry already established this "public
+// field, not a Builder chain" pattern for the pieces without one), so this mirrors
+// ApplySharedProps's own five-events-plus-class set by hand rather than through a
+// templated Builder call.
+void ApplySharedPropsToWidget(WidgetBase& Widget, const IrisProps& Props) {
+    if (const auto ClassName = GetStringProp(Props, "class")) {
+        Widget.ClassName = *ClassName;
+    }
+    if (const auto OnPress = GetEventProp(Props, "onPress")) {
+        Widget.OnPressed = *OnPress;
+    }
+    if (const auto OnRelease = GetEventProp(Props, "onRelease")) {
+        Widget.OnReleased = *OnRelease;
+    }
+    if (const auto OnHover = GetEventProp(Props, "onHover")) {
+        Widget.OnHovered = *OnHover;
+    }
+    if (const auto OnFocus = GetEventProp(Props, "onFocus")) {
+        Widget.OnFocused = *OnFocus;
+    }
+    if (const auto OnChange = GetEventProp(Props, "onChange")) {
+        Widget.OnChanged = *OnChange;
+    }
+}
+
 // docs/lustre_core_spec.md §1.1's mapping table, keyed the other direction (a Core tag
 // to the PascalCase string Lustre::IStyleTarget::PrimitiveTag() reports -- these already
 // match one-for-one, this just names the IrisElementTag values Lustre's own selector
@@ -71,6 +103,8 @@ std::string IrisTagToLustreTag(IrisElementTag Tag) {
         case IrisElementTag::Image: return "Image";
         case IrisElementTag::Icon: return "Icon";
         case IrisElementTag::Text: return "Text";
+        case IrisElementTag::Scroll: return "Scroll";
+        case IrisElementTag::Input: return "Input";
         default: return ""; // None/Slot never reach here -- see BuildWidgetTreeInternal
     }
 }
@@ -244,6 +278,49 @@ std::unique_ptr<WidgetBase> BuildIcon(const Component& Node, const BuildContext&
     return Built;
 }
 
+// <Scroll> (docs/iris_core_spec.md §3.1) -- element children only, same as <Frame>, but
+// ScrollablePanel has no Builder to route them through: AddChild directly, same "plain
+// field/method, not a Builder chain" treatment ApplySharedPropsToWidget above already
+// gives its shared props. wheelStep maps onto WheelStepLogical, the one dedicated field
+// this widget has.
+std::unique_ptr<WidgetBase> BuildScroll(const Component& Node, const BuildContext& Context,
+                                        const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags) {
+    auto Built = std::make_unique<ScrollablePanel>();
+    ApplySharedPropsToWidget(*Built, Node.Props);
+    if (const auto WheelStep = GetFloatProp(Node.Props, "wheelStep")) {
+        Built->WheelStepLogical = *WheelStep;
+    }
+    for (const Component& Child : Node.Children) {
+        if (std::unique_ptr<WidgetBase> ChildWidget =
+                BuildWidgetTreeInternal(Child, Context, &ThisStyleElement, /*IsComponentRoot=*/false, OutTags)) {
+            Built->AddChild(std::move(ChildWidget));
+        }
+    }
+    return Built;
+}
+
+// <Input> (docs/iris_core_spec.md §3.1) -- a leaf, same shape as <Icon>: TextInput has
+// no Builder either. FontBackend/Font are set directly from Context, the same
+// "Label::Builder has no method for it" treatment BuildText below already uses; Focus/
+// Clipboard likewise come straight from Context (both may be null -- an inert but
+// still-built widget, same tolerance BuildImage/BuildIcon already have for their own
+// optional backend pointers).
+std::unique_ptr<WidgetBase> BuildInput(const Component& Node, const BuildContext& Context) {
+    auto Built = std::make_unique<TextInput>();
+    ApplySharedPropsToWidget(*Built, Node.Props);
+    if (const auto Text = GetStringProp(Node.Props, "text")) {
+        Built->Text = *Text;
+    }
+    if (const auto PreferredWidth = GetFloatProp(Node.Props, "preferredWidth")) {
+        Built->PreferredWidthLogical = *PreferredWidth;
+    }
+    Built->FontBackend = Context.FontBackend;
+    Built->Font = Context.Font;
+    Built->Focus = Context.Focus;
+    Built->Clipboard = Context.Clipboard;
+    return Built;
+}
+
 std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const BuildContext& Context,
                                                      const WalkerStyleElement* ParentStyleElement,
                                                      bool IsComponentRoot, PrimitiveTagMap* OutTags) {
@@ -277,6 +354,12 @@ std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const
             break;
         case IrisElementTag::Text:
             Built = BuildText(Node, Context);
+            break;
+        case IrisElementTag::Scroll:
+            Built = BuildScroll(Node, Context, ThisStyleElement, OutTags);
+            break;
+        case IrisElementTag::Input:
+            Built = BuildInput(Node, Context);
             break;
         default:
             break; // unreachable -- None/Slot returned above, every other tag handled
