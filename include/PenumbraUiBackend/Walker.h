@@ -3,7 +3,8 @@
 #include "Lustre/Resolver.h"
 #include "PenumbraUiBackend/Lustre/StyleApplier.h"
 
-#include "Iris/IrisComponent.h"
+#include "Iris/Component.h"
+#include "Penumbra/Backends/IIconBackend.h"
 #include "Penumbra/Backends/IImageBackend.h"
 #include "Penumbra/Render/IFontBackend.h"
 #include "Penumbra/Widgets/WidgetBase.h"
@@ -29,7 +30,7 @@ namespace PenumbraUiBackend {
 // unreliable for Frame/Grid specifically).
 using PrimitiveTagMap = std::unordered_map<const Penumbra::Widgets::WidgetBase*, std::string>;
 
-// Resources BuildWidgetTree needs beyond what an IrisComponent tree itself carries.
+// Resources BuildWidgetTree needs beyond what an Component tree itself carries.
 // Penumbra's own primitives don't take these through their fluent Builder: `Label`'s
 // `FontBackend`/`Font` are plain public fields set after construction (there's no
 // Builder method for either — confirmed against penumbra-proto's own demo, which sets
@@ -49,16 +50,17 @@ struct BuildContext {
     Penumbra::Render::IFontBackend*    FontBackend{nullptr};
     Penumbra::Render::FontHandle       Font{0};
     Penumbra::Backends::IImageBackend* ImageBackend{nullptr};
+    Penumbra::Backends::IIconBackend*  IconBackend{nullptr};
     SDL_Renderer*                      SdlRenderer{nullptr};
 
     const ::Lustre::StylesheetSet* Style{nullptr};
     const Lustre::IStyleApplier*    StyleApplier{nullptr};
 };
 
-// Walks a single `IrisComponent` IR node (docs/iris_core_spec.md §2.5, from the `iris`
+// Walks a single `Component` IR node (docs/iris_core_spec.md §2.5, from the `iris`
 // preprocessor — never a Penumbra type) and builds the equivalent real Penumbra widget
 // via that primitive's own fluent `Builder`, recursing into `Node.Children`. This is
-// Stage 2 only: a one-shot tree build, no diffing, no identity tracking — `IrisComponent`
+// Stage 2 only: a one-shot tree build, no diffing, no identity tracking — `Component`
 // does carry a `Key` now (docs/iris_stage3_implementation_decision.md, in the `iris`
 // repo), but this function never reads it; matching by key across two trees is Stage 3's
 // reconciler's job (`PenumbraWidgetAdapter.h`), built on top of this, not part of it.
@@ -73,7 +75,7 @@ struct BuildContext {
 //     invoked), so this function leaves its position empty, same as `None`. The real
 //     content gets spliced in afterward by `iris::ResolveSlots`
 //     (`Iris/SlotResolution.h`, in the `iris` repo), which walks the just-built static
-//     tree and `Node`'s own `IrisComponent` tree in lockstep to find each `<Slot>`'s
+//     tree and `Node`'s own `Component` tree in lockstep to find each `<Slot>`'s
 //     correct position and attach its initial (and, later, every subsequent) render
 //     there. A `<Slot>` at the very root of what's being built (no static wrapper at
 //     all, e.g. `render { <Slot>...</Slot> }`) is a different case `ResolveSlots`
@@ -86,13 +88,13 @@ struct BuildContext {
 // does internally. `Node` itself is always treated as a component-root boundary (§1.2):
 // correct for every real caller today (this function is only ever invoked at a whole
 // mount's root — see `MakeMountFn`/`iris::ResolveSlots`), but not detectable from
-// `IrisComponent` alone if a future caller ever builds a *sub*tree containing more than
+// `Component` alone if a future caller ever builds a *sub*tree containing more than
 // one component's worth of composed content in a single call.
 //
 // When OutTags is non-null, every built widget's raw pointer is recorded there against
 // its real Lustre primitive tag -- see PrimitiveTagMap's own comment above. Left null
 // (the default), behaves exactly as before this parameter existed.
-std::unique_ptr<Penumbra::Widgets::WidgetBase> BuildWidgetTree(const Iris::IrisComponent& Node,
+std::unique_ptr<Penumbra::Widgets::WidgetBase> BuildWidgetTree(const Iris::Component& Node,
                                                                  const BuildContext&        Context,
                                                                  PrimitiveTagMap*           OutTags = nullptr);
 

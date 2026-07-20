@@ -1,6 +1,8 @@
 #include "PenumbraUiBackend/Walker.h"
 
+#include "Penumbra/Backends/IIconBackend.h"
 #include "Penumbra/Widgets/Box.h"
+#include "Penumbra/Widgets/IconWidget.h"
 #include "Penumbra/Widgets/ImageWidget.h"
 #include "Penumbra/Widgets/InlineContainer.h"
 #include "Penumbra/Widgets/Label.h"
@@ -21,25 +23,26 @@ void Expect(bool Condition, const std::string& Description) {
     }
 }
 
-using Iris::IrisComponent;
+using Iris::Component;
 using Iris::IrisElementTag;
 using Iris::IrisProps;
 using Iris::IrisPropValue;
 using PenumbraUiBackend::BuildContext;
 using PenumbraUiBackend::BuildWidgetTree;
 using Penumbra::Widgets::Box;
+using Penumbra::Widgets::IconWidget;
 using Penumbra::Widgets::ImageWidget;
 using Penumbra::Widgets::InlineContainer;
 using Penumbra::Widgets::Label;
 using Penumbra::Widgets::LayoutMode;
 using Penumbra::Widgets::WidgetBase;
 
-IrisComponent MakeNode(IrisElementTag Tag, IrisProps Props = {}, std::vector<IrisComponent> Children = {}) {
-    return IrisComponent(Tag, std::move(Props), std::move(Children), nullptr);
+Component MakeNode(IrisElementTag Tag, IrisProps Props = {}, std::vector<Component> Children = {}) {
+    return Component(Tag, std::move(Props), std::move(Children), nullptr);
 }
 
 void TestNoneProducesNoWidget() {
-    const auto Built = BuildWidgetTree(IrisComponent(nullptr), BuildContext{});
+    const auto Built = BuildWidgetTree(Component(nullptr), BuildContext{});
     Expect(Built == nullptr, "IrisElementTag::None builds to nullptr — no widget, not an error");
 }
 
@@ -56,9 +59,9 @@ void TestFrameBuildsABoxWithClassName() {
 }
 
 void TestFrameChildrenAreAttachedAndNoneChildrenAreSkipped() {
-    std::vector<IrisComponent> Children;
+    std::vector<Component> Children;
     Children.push_back(MakeNode(IrisElementTag::Frame));
-    Children.push_back(IrisComponent(nullptr)); // None — should be silently dropped
+    Children.push_back(Component(nullptr)); // None — should be silently dropped
     Children.push_back(MakeNode(IrisElementTag::Frame));
 
     const auto Node = MakeNode(IrisElementTag::Frame, {}, std::move(Children));
@@ -133,16 +136,47 @@ void TestImageBuildsWithoutLoadingWhenNoBackendProvided() {
            "no texture is loaded when BuildContext has no ImageBackend/SdlRenderer");
 }
 
+void TestIconBuildsWithIconNameEvenWithoutBackendProvided() {
+    IrisProps Props;
+    Props["icon"] = IrisPropValue{std::string("chevron-down")};
+    const auto Node = MakeNode(IrisElementTag::Icon, Props);
+
+    const auto Built = BuildWidgetTree(Node, BuildContext{}); // no IconBackend
+    const auto* AsIcon = dynamic_cast<IconWidget*>(Built.get());
+    Expect(AsIcon != nullptr, "<Icon> builds an IconWidget");
+    Expect(AsIcon != nullptr && AsIcon->IconName == "chevron-down",
+           "the icon prop reaches IconWidget::IconName even though no backend was provided");
+    Expect(AsIcon != nullptr && AsIcon->IconBackend == nullptr,
+           "IconWidget::IconBackend stays null when BuildContext has no IconBackend");
+}
+
+void TestIconPicksUpIconBackendFromBuildContext() {
+    struct FakeIconBackend : Penumbra::Backends::IIconBackend {
+        void DrawIcon(Penumbra::Render::Renderer&, std::string_view, Penumbra::Rect) override {}
+    } Backend;
+
+    IrisProps Props;
+    Props["icon"] = IrisPropValue{std::string("chevron-down")};
+    const auto Node = MakeNode(IrisElementTag::Icon, Props);
+
+    BuildContext Context;
+    Context.IconBackend = &Backend;
+    const auto Built = BuildWidgetTree(Node, Context);
+    const auto* AsIcon = dynamic_cast<IconWidget*>(Built.get());
+    Expect(AsIcon != nullptr && AsIcon->IconBackend == &Backend,
+           "IconWidget::IconBackend is populated from BuildContext.IconBackend");
+}
+
 void TestNestedTreeBuildsRecursively() {
     // <Frame class="party-row"><HealthBar-shaped Frame/></Frame> — a small stand-in for
     // the spec §9 PartyScreen shape, since <HealthBar> itself is a component invocation
-    // Codegen resolves away before this walker ever sees an IrisComponent tree.
-    std::vector<IrisComponent> Inner;
+    // Codegen resolves away before this walker ever sees an Component tree.
+    std::vector<Component> Inner;
     IrisProps                   TextProps;
     TextProps["text"] = IrisPropValue{std::string("42/100")};
     Inner.push_back(MakeNode(IrisElementTag::Text, TextProps));
 
-    std::vector<IrisComponent> Outer;
+    std::vector<Component> Outer;
     Outer.push_back(MakeNode(IrisElementTag::Frame, {}, std::move(Inner)));
 
     const auto Node = MakeNode(IrisElementTag::Frame, {}, std::move(Outer));
@@ -169,6 +203,8 @@ void RunWalkerTests() {
     TestTextBuildsALabelWithContent();
     TestTextPicksUpFontFromBuildContext();
     TestImageBuildsWithoutLoadingWhenNoBackendProvided();
+    TestIconBuildsWithIconNameEvenWithoutBackendProvided();
+    TestIconPicksUpIconBackendFromBuildContext();
     TestNestedTreeBuildsRecursively();
 }
 

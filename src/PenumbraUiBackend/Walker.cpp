@@ -3,6 +3,7 @@
 #include "PenumbraUiBackend/Lustre/StyleResolution.h"
 
 #include "Penumbra/Widgets/Box.h"
+#include "Penumbra/Widgets/IconWidget.h"
 #include "Penumbra/Widgets/ImageWidget.h"
 #include "Penumbra/Widgets/InlineContainer.h"
 #include "Penumbra/Widgets/Label.h"
@@ -15,10 +16,11 @@ namespace PenumbraUiBackend {
 
 namespace {
 
-using Iris::IrisComponent;
+using Iris::Component;
 using Iris::IrisElementTag;
 using Iris::IrisProps;
 using Penumbra::Widgets::Box;
+using Penumbra::Widgets::IconWidget;
 using Penumbra::Widgets::ImageWidget;
 using Penumbra::Widgets::InlineContainer;
 using Penumbra::Widgets::Label;
@@ -56,6 +58,7 @@ std::string IrisTagToLustreTag(IrisElementTag Tag) {
         case IrisElementTag::Inline: return "Inline";
         case IrisElementTag::Grid: return "Grid";
         case IrisElementTag::Image: return "Image";
+        case IrisElementTag::Icon: return "Icon";
         case IrisElementTag::Text: return "Text";
         default: return ""; // None/Slot never reach here -- see BuildWidgetTreeInternal
     }
@@ -86,7 +89,7 @@ private:
     const WalkerStyleElement* Parent_;
 };
 
-std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const IrisComponent& Node, const BuildContext& Context,
+std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const BuildContext& Context,
                                                      const WalkerStyleElement* ParentStyleElement,
                                                      bool IsComponentRoot, PrimitiveTagMap* OutTags);
 
@@ -123,9 +126,9 @@ void ApplySharedProps(BuilderT& Builder, const IrisProps& Props) {
 // the caller -- passed down so every child's WalkerStyleElement can point back to it as
 // their ancestor.
 template <typename BoxLikeBuilder>
-void BuildAndAttachChildren(BoxLikeBuilder& Builder, const IrisComponent& Node, const BuildContext& Context,
+void BuildAndAttachChildren(BoxLikeBuilder& Builder, const Component& Node, const BuildContext& Context,
                              const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags) {
-    for (const IrisComponent& Child : Node.Children) {
+    for (const Component& Child : Node.Children) {
         if (std::unique_ptr<WidgetBase> ChildWidget =
                 BuildWidgetTreeInternal(Child, Context, &ThisStyleElement, /*IsComponentRoot=*/false, OutTags)) {
             Builder.child(std::move(ChildWidget));
@@ -133,7 +136,7 @@ void BuildAndAttachChildren(BoxLikeBuilder& Builder, const IrisComponent& Node, 
     }
 }
 
-std::unique_ptr<WidgetBase> BuildFrame(const IrisComponent& Node, const BuildContext& Context,
+std::unique_ptr<WidgetBase> BuildFrame(const Component& Node, const BuildContext& Context,
                                         const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags) {
     Box::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
@@ -146,7 +149,7 @@ std::unique_ptr<WidgetBase> BuildFrame(const IrisComponent& Node, const BuildCon
 // as a stub, which explicitly does not meet the Core-primitive requirement yet. `Layout`
 // is a public field on `Box`, not something `Box::Builder` exposes — there's no
 // `layout()` Builder method to chain, so it's set directly on the built widget.
-std::unique_ptr<WidgetBase> BuildGrid(const IrisComponent& Node, const BuildContext& Context,
+std::unique_ptr<WidgetBase> BuildGrid(const Component& Node, const BuildContext& Context,
                                        const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags) {
     Box::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
@@ -156,7 +159,7 @@ std::unique_ptr<WidgetBase> BuildGrid(const IrisComponent& Node, const BuildCont
     return Built;
 }
 
-std::unique_ptr<WidgetBase> BuildInline(const IrisComponent& Node, const BuildContext& Context,
+std::unique_ptr<WidgetBase> BuildInline(const Component& Node, const BuildContext& Context,
                                          const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags) {
     InlineContainer::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
@@ -170,7 +173,7 @@ std::unique_ptr<WidgetBase> BuildInline(const IrisComponent& Node, const BuildCo
 // `Label::Builder` has no way to set `FontBackend`/`Font` (Penumbra's own demo sets
 // both as plain fields after construction — there's no Builder method for either), so
 // that happens here too, from `Context`.
-std::unique_ptr<WidgetBase> BuildText(const IrisComponent& Node, const BuildContext& Context) {
+std::unique_ptr<WidgetBase> BuildText(const Component& Node, const BuildContext& Context) {
     Label::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
     if (const auto Text = GetStringProp(Node.Props, "text")) {
@@ -188,7 +191,7 @@ std::unique_ptr<WidgetBase> BuildText(const IrisComponent& Node, const BuildCont
 // available, which is exactly what `Context.ImageBackend`/`Context.SdlRenderer` are
 // for. Building still succeeds with either left null (e.g. a structural test with no
 // real backend) — the widget just never gets a texture loaded.
-std::unique_ptr<WidgetBase> BuildImage(const IrisComponent& Node, const BuildContext& Context) {
+std::unique_ptr<WidgetBase> BuildImage(const Component& Node, const BuildContext& Context) {
     ImageWidget::Builder Builder;
     if (const auto ClassName = GetStringProp(Node.Props, "class")) {
         Builder.className(*ClassName);
@@ -203,7 +206,28 @@ std::unique_ptr<WidgetBase> BuildImage(const IrisComponent& Node, const BuildCon
     return Built;
 }
 
-std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const IrisComponent& Node, const BuildContext& Context,
+// `<Icon>` is a leaf with a deliberately narrow Builder (no child()/children(), no
+// event props — docs/iris_core_spec.md §3.1, same shape as `<Image>`). Unlike
+// `<Image>` there is no separate load step: `IconWidget::IconBackend` is a plain
+// public field (mirroring how `Label::FontBackend`/`Font` are already set directly
+// below in BuildText, not through the Builder), set here from `Context.IconBackend` so
+// Draw() can resolve the icon name fresh every frame. Building still succeeds with
+// `Context.IconBackend` left null (e.g. a structural test with no real backend) — the
+// widget just never draws anything.
+std::unique_ptr<WidgetBase> BuildIcon(const Component& Node, const BuildContext& Context) {
+    IconWidget::Builder Builder;
+    if (const auto ClassName = GetStringProp(Node.Props, "class")) {
+        Builder.className(*ClassName);
+    }
+    if (const auto Icon = GetStringProp(Node.Props, "icon")) {
+        Builder.icon(*Icon);
+    }
+    std::unique_ptr<IconWidget> Built = Builder.build();
+    Built->IconBackend = Context.IconBackend;
+    return Built;
+}
+
+std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const BuildContext& Context,
                                                      const WalkerStyleElement* ParentStyleElement,
                                                      bool IsComponentRoot, PrimitiveTagMap* OutTags) {
     // None/Slot build to nullptr with no widget at all -- nothing to construct a style
@@ -231,6 +255,9 @@ std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const IrisComponent& Node, c
         case IrisElementTag::Image:
             Built = BuildImage(Node, Context);
             break;
+        case IrisElementTag::Icon:
+            Built = BuildIcon(Node, Context);
+            break;
         case IrisElementTag::Text:
             Built = BuildText(Node, Context);
             break;
@@ -256,7 +283,7 @@ std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const IrisComponent& Node, c
 
 } // namespace
 
-std::unique_ptr<WidgetBase> BuildWidgetTree(const IrisComponent& Node, const BuildContext& Context,
+std::unique_ptr<WidgetBase> BuildWidgetTree(const Component& Node, const BuildContext& Context,
                                              PrimitiveTagMap* OutTags) {
     return BuildWidgetTreeInternal(Node, Context, /*ParentStyleElement=*/nullptr, /*IsComponentRoot=*/true, OutTags);
 }

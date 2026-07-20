@@ -3,7 +3,7 @@
 > **Status:** Implemented, wired into both the mount path (`Walker.cpp`) and the
 > reconcile-time class-change path (`PenumbraWidgetAdapter.cpp`), and tested end to end
 > against real Penumbra widgets (`Box`, `Button`, `Checkbox`, `Label`) built from real
-> `IrisComponent` trees — not just structural assertions on the applier in isolation.
+> `Component` trees — not just structural assertions on the applier in isolation.
 
 ---
 
@@ -37,7 +37,7 @@ where a new *target* inside this one repo does.
 
 Kept as an independent CMake target (`penumbra_ui_backend_lustre`) rather than merged
 into `penumbra_ui_backend` itself, because it genuinely doesn't need anything from
-`iris` — it operates on plain `Penumbra::Widgets::WidgetBase&`, never `IrisComponent`.
+`iris` — it operates on plain `Penumbra::Widgets::WidgetBase&`, never `Component`.
 A consumer that only needs the Walker (no styling yet, or a different styling approach)
 doesn't have to pull in `lustre` at all.
 
@@ -106,7 +106,7 @@ pointer to its own caller's `WalkerStyleElement` — descendant-selector ancestr
 of the recursion for free. `Node` (the argument to whichever `BuildWidgetTree()` call
 started this recursion) is always treated as the component-root boundary; correct for
 every real caller today (only ever invoked at a whole mount's root, directly or via
-`iris::ResolveSlots`), but not detectable from `IrisComponent` alone if a future caller
+`iris::ResolveSlots`), but not detectable from `Component` alone if a future caller
 ever composed more than one component's worth of content into a single `BuildWidgetTree`
 call without going through `<Slot>`.
 

@@ -87,7 +87,7 @@ Maps `Umbra::IrisPropDiff`'s fields onto real `WidgetBase`/subclass state:
 
 A further attempt to verify this against a genuine `.iris` → `iris_cc` →
 generated-header → real-`Signal`-driven pipeline (not just hand-constructed
-`IrisComponent` values) surfaced a separate, serious defect **unrelated to this
+`Component` values) surfaced a separate, serious defect **unrelated to this
 adapter**: a `<Slot>` callable that captures an `iris::Signal<T>` local by reference
 (exactly the pattern every example in `docs/iris_core_spec.md` uses) was reading freed
 stack memory the instant the declaring component function returned — confirmed with
@@ -110,6 +110,6 @@ AddressSanitizer, completes with zero errors.
 
 **Done, since this doc was written:** wiring a `<Slot>`'s own root widget into the
 static tree above it — `MakeMountFn`/`SlotState` are now driven from Stage 2's
-`BuildWidgetTree` via `iris::ResolveSlots`, for both the single-`IrisComponent`- and
+`BuildWidgetTree` via `iris::ResolveSlots`, for both the single-`Component`- and
 list-returning callable shapes. See the README's own `<Slot>` wiring section and `iris`'s
 `docs/iris_slot_stage2_wiring_decision.md`/`docs/iris_slot_list_wiring_decision.md`.

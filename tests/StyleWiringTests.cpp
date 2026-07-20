@@ -24,7 +24,7 @@ void Expect(bool Condition, const std::string& Description) {
     }
 }
 
-using Iris::IrisComponent;
+using Iris::Component;
 using Iris::IrisElementTag;
 using Iris::IrisProps;
 using Iris::IrisPropValue;
@@ -38,8 +38,8 @@ using Penumbra::Widgets::Box;
 using Penumbra::Widgets::Label;
 using Penumbra::Widgets::WidgetBase;
 
-IrisComponent MakeNode(IrisElementTag Tag, IrisProps Props = {}, std::vector<IrisComponent> Children = {}) {
-    return IrisComponent(Tag, std::move(Props), std::move(Children), nullptr);
+Component MakeNode(IrisElementTag Tag, IrisProps Props = {}, std::vector<Component> Children = {}) {
+    return Component(Tag, std::move(Props), std::move(Children), nullptr);
 }
 
 IrisProps WithClass(const std::string& ClassName) {
@@ -109,7 +109,7 @@ void TestMountResolvesADescendantSelectorAcrossRealAncestry() {
     Context.Style = &Sheets;
     Context.StyleApplier = &Applier;
 
-    std::vector<IrisComponent> Children;
+    std::vector<Component> Children;
     Children.push_back(MakeNode(IrisElementTag::Text, WithClass("card-title")));
     const auto Node = MakeNode(IrisElementTag::Frame, WithClass("card"), std::move(Children));
 
@@ -120,7 +120,7 @@ void TestMountResolvesADescendantSelectorAcrossRealAncestry() {
     const auto* AsLabel = dynamic_cast<const Label*>(ChildWidget);
 
     Expect(AsLabel != nullptr && AsLabel->ColorText.R == 0xFF && AsLabel->ColorText.G == 0xFF,
-           "`.card .card-title` resolves across the real IrisComponent ancestry built in one BuildWidgetTree call");
+           "`.card .card-title` resolves across the real Component ancestry built in one BuildWidgetTree call");
 }
 
 void TestMountMergesGlobalAndComponentLayers() {
@@ -214,7 +214,7 @@ void TestClassChangeOnANestedChildRespectsRealAncestryThroughTheWrapperTree() {
     Context.Style = &Sheets;
     Context.StyleApplier = &Applier;
 
-    std::vector<IrisComponent> Children;
+    std::vector<Component> Children;
     Children.push_back(MakeNode(IrisElementTag::Text));
     const auto Node = MakeNode(IrisElementTag::Frame, WithClass("card"), std::move(Children));
 

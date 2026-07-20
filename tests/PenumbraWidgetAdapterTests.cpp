@@ -22,7 +22,7 @@ void Expect(bool Condition, const std::string& Description) {
     }
 }
 
-using Iris::IrisComponent;
+using Iris::Component;
 using Iris::IrisElementTag;
 using Iris::IrisProps;
 using Iris::IrisPropValue;
@@ -33,19 +33,19 @@ using PenumbraUiBackend::WrapExistingTree;
 using Penumbra::Widgets::Box;
 using Penumbra::Widgets::Label;
 
-IrisComponent MakeFrame(const std::string& ClassName, std::vector<IrisComponent> Children = {},
+Component MakeFrame(const std::string& ClassName, std::vector<Component> Children = {},
                          std::optional<IrisPropValue> Key = std::nullopt) {
     IrisProps Props;
     Props["class"] = IrisPropValue{ClassName};
-    IrisComponent Node(IrisElementTag::Frame, Props, std::move(Children), nullptr);
+    Component Node(IrisElementTag::Frame, Props, std::move(Children), nullptr);
     Node.Key = std::move(Key);
     return Node;
 }
 
 void TestWrapExistingTreeMirrorsRealTreeStructure() {
-    std::vector<IrisComponent> Inner;
+    std::vector<Component> Inner;
     Inner.push_back(MakeFrame("child"));
-    const IrisComponent Root = MakeFrame("parent", std::move(Inner));
+    const Component Root = MakeFrame("parent", std::move(Inner));
 
     const iris::MountFn Mount = MakeMountFn(BuildContext{});
     std::unique_ptr<Umbra::IWidget> Wrapped = Mount(Root);
@@ -82,12 +82,12 @@ void TestApplyPropDiffReachesRealWidgetBaseFields() {
 void TestReconcilerUpdatesRealWidgetTreeInPlace() {
     const iris::MountFn Mount = MakeMountFn(BuildContext{});
 
-    const IrisComponent Old = MakeFrame("a", {}, IrisPropValue(1));
+    const Component Old = MakeFrame("a", {}, IrisPropValue(1));
     std::unique_ptr<Umbra::IWidget> Widget = Mount(Old);
     auto*                            AsBox = dynamic_cast<Box*>(dynamic_cast<PenumbraWidget*>(Widget.get())->RawWidget());
     const Box*                       OriginalBoxAddress = AsBox;
 
-    const IrisComponent New = MakeFrame("b", {}, IrisPropValue(1));
+    const Component New = MakeFrame("b", {}, IrisPropValue(1));
     iris::ReconcileWidget(Widget, Old, New, Mount);
 
     AsBox = dynamic_cast<Box*>(dynamic_cast<PenumbraWidget*>(Widget.get())->RawWidget());
@@ -99,12 +99,12 @@ void TestReconcilerUpdatesRealWidgetTreeInPlace() {
 void TestReconcilerAddsRealChildToRealParentBox() {
     const iris::MountFn Mount = MakeMountFn(BuildContext{});
 
-    const IrisComponent Old = MakeFrame("parent");
+    const Component Old = MakeFrame("parent");
     std::unique_ptr<Umbra::IWidget> Widget = Mount(Old);
 
-    std::vector<IrisComponent> NewChildren;
+    std::vector<Component> NewChildren;
     NewChildren.push_back(MakeFrame("child"));
-    const IrisComponent New = MakeFrame("parent", std::move(NewChildren));
+    const Component New = MakeFrame("parent", std::move(NewChildren));
     iris::ReconcileWidget(Widget, Old, New, Mount);
 
     Expect(Widget->GetChildCount() == 1, "the wrapper now reports one child");
@@ -118,7 +118,7 @@ void TestSignalDrivesRealPenumbraTreeThroughFullStack() {
     const iris::MountFn Mount = MakeMountFn(BuildContext{});
 
     iris::Signal<std::string> ClassName("initial");
-    auto Callable = Iris::MakeSlotCallable([&]() -> IrisComponent { return MakeFrame(ClassName.get()); });
+    auto Callable = Iris::MakeSlotCallable([&]() -> Component { return MakeFrame(ClassName.get()); });
     iris::SlotState Slot(Callable, Mount);
     Slot.Reconcile(); // mount
 

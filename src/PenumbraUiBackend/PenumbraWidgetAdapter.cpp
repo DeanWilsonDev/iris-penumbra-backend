@@ -278,7 +278,7 @@ std::unique_ptr<PenumbraWidget> WrapExistingTree(std::unique_ptr<WidgetBase>    
 }
 
 iris::MountFn MakeMountFn(BuildContext Context) {
-    return [Context](const Iris::IrisComponent& Node) -> std::unique_ptr<Umbra::IWidget> {
+    return [Context](const Iris::Component& Node) -> std::unique_ptr<Umbra::IWidget> {
         PrimitiveTagMap             Tags;
         std::unique_ptr<WidgetBase> Built = BuildWidgetTree(Node, Context, &Tags);
         if (!Built) {

@@ -11,7 +11,7 @@
 
 The Penumbra backend for [Iris](https://github.com/DeanWilsonDev/iris) and
 [Lustre](https://github.com/DeanWilsonDev/lustre): the code that walks a parsed,
-props-resolved `IrisComponent` IR tree and builds a real
+props-resolved `Component` IR tree and builds a real
 [Penumbra](https://github.com/DeanWilsonDev/penumbra-proto) widget tree from it via Penumbra's
 fluent `Builder` API (`Box::Builder`, `Label::Builder`, etc.), and applies Lustre's resolved
 styles onto that same real widget tree.
@@ -34,9 +34,9 @@ instead of splitting into a separate Lustre-specific bridge.
 
 This is Stage 2 of Iris's roadmap (see `iris`'s `docs/iris_handoff.md` §6). The walker is
 implemented: `PenumbraUiBackend::BuildWidgetTree()` (`include/PenumbraUiBackend/Walker.h`)
-takes a single `IrisComponent` IR node and recursively builds the equivalent real Penumbra
+takes a single `Component` IR node and recursively builds the equivalent real Penumbra
 widget tree via each Core primitive's own fluent `Builder`. It's a one-shot tree build only —
-no diffing, no identity tracking (`key` never reaches `IrisComponent`; it's stripped by Iris's
+no diffing, no identity tracking (`key` never reaches `Component`; it's stripped by Iris's
 preprocessor before codegen, so there's nothing here for a `key`-based live-widget map to key
 off of — that's a Stage 3 reconciler concern layered on top of this, not part of it).
 
@@ -59,7 +59,7 @@ structural tests that don't need a real font/SDL context.
 
 Verified against the full pipeline, not just in isolation: a real `.iris` component
 (`HealthBar`, with a `<Frame class="...">` wrapping a `<Text>{props.label}</Text>`) compiled
-through `iris`'s own `iris_cc` CLI, `#include`d, called, and the resulting `IrisComponent` fed
+through `iris`'s own `iris_cc` CLI, `#include`d, called, and the resulting `Component` fed
 through `BuildWidgetTree` — producing a real `Box`/`Label` tree with the class name, child
 count, and interpolated text all correct. See `tests/WalkerTests.cpp` for the structural test
 suite (`IrisElementTag::None` skipping, event-prop wiring, the `<Grid>` stub, nested recursion,
@@ -88,7 +88,7 @@ real Penumbra widgets under AddressSanitizer with zero errors after the bump.
 **`<Slot>` is now wired in, for both callable shapes**: `BuildWidgetTree` treats a `<Slot>` child
 exactly like `None` during the static build (contributes nothing); a new `iris::ResolveSlots()`
 (`iris`'s `include/Iris/SlotResolution.h`) then walks the just-built tree and the source
-`IrisComponent` tree in lockstep, and for each `<Slot>` found, attaches a `SlotState` to its
+`Component` tree in lockstep, and for each `<Slot>` found, attaches a `SlotState` to its
 exact position and performs its initial mount. A `SlotSiblingGroup` shared by every `<Slot>`
 sibling under the same static parent recomputes each slot's absolute position fresh on every
 reconcile, so a list-returning `<Slot>`'s own growth/shrinkage (and a sibling toggling to/from
@@ -112,7 +112,7 @@ widget, `:hover`/`:active`/`:disabled` overlays onto `Button`'s real interaction
 (the one widget type with them today), and `color`/`font-family`/`font-size` onto `Label`, with
 font-handle resolution cached by `(path, size)`. Deliberately its own target and its own vendored
 submodule (`vendor/lustre`) rather than folded into `penumbra_ui_backend` — it needs nothing
-from `iris` (it operates on plain `Penumbra::Widgets::WidgetBase&`, never `IrisComponent`), so a
+from `iris` (it operates on plain `Penumbra::Widgets::WidgetBase&`, never `Component`), so a
 consumer that doesn't use Lustre doesn't pull it in. See
 `docs/penumbra_ui_backend_lustre_bridge_decision.md` for why this lives here rather than in a
 fourth repo, and what the `IStyleApplier` interface does and doesn't buy in terms of swapping in
@@ -133,7 +133,7 @@ composes two `Lustre::Resolver::Resolve()` calls, since `Resolve()` itself only 
 that never sets them gets exactly the pre-wiring behavior. Full reasoning in
 `docs/penumbra_ui_backend_lustre_bridge_decision.md`'s "Wiring into the mount and reconcile
 paths" section. `tests/StyleWiringTests.cpp` covers mount-time resolution, descendant
-selectors across real `IrisComponent` ancestry, the global/component merge, and
+selectors across real `Component` ancestry, the global/component merge, and
 reconcile-time re-resolution including the stale-property-clearing behavior.
 
 **The reconcile path's primitive-tag limitation is now fixed.** Primitive-element selectors

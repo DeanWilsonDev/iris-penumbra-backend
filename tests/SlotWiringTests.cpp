@@ -22,7 +22,7 @@ void Expect(bool Condition, const std::string& Description) {
     }
 }
 
-using Iris::IrisComponent;
+using Iris::Component;
 using Iris::IrisElementTag;
 using Iris::IrisProps;
 using Iris::IrisPropValue;
@@ -32,18 +32,18 @@ using PenumbraUiBackend::PenumbraWidget;
 using Penumbra::Widgets::Box;
 using Penumbra::Widgets::Label;
 
-IrisComponent MakeFrame(std::vector<IrisComponent> Children = {}) {
-    return IrisComponent(IrisElementTag::Frame, {}, std::move(Children), nullptr);
+Component MakeFrame(std::vector<Component> Children = {}) {
+    return Component(IrisElementTag::Frame, {}, std::move(Children), nullptr);
 }
 
-IrisComponent MakeText(const std::string& Content) {
+Component MakeText(const std::string& Content) {
     IrisProps Props;
     Props["text"] = IrisPropValue{Content};
-    return IrisComponent(IrisElementTag::Text, Props, {}, nullptr);
+    return Component(IrisElementTag::Text, Props, {}, nullptr);
 }
 
-IrisComponent MakeSlot(std::shared_ptr<Iris::IrisSlotCallable> Callable) {
-    return IrisComponent(IrisElementTag::Slot, {}, {}, std::move(Callable));
+Component MakeSlot(std::shared_ptr<Iris::IrisSlotCallable> Callable) {
+    return Component(IrisElementTag::Slot, {}, {}, std::move(Callable));
 }
 
 // The full stack, against a REAL Penumbra tree: BuildWidgetTree (Stage 2) builds the
@@ -53,9 +53,9 @@ IrisComponent MakeSlot(std::shared_ptr<Iris::IrisSlotCallable> Callable) {
 void TestSlotWiresIntoRealStaticPenumbraTree() {
     const iris::MountFn Mount = MakeMountFn(BuildContext{});
 
-    IrisComponent RootNode = MakeFrame({
+    Component RootNode = MakeFrame({
         MakeText("before"),
-        MakeSlot(Iris::MakeSlotCallable([]() -> IrisComponent { return MakeText("slot-content"); })),
+        MakeSlot(Iris::MakeSlotCallable([]() -> Component { return MakeText("slot-content"); })),
         MakeText("after"),
     });
     std::unique_ptr<Umbra::IWidget> Root = Mount(RootNode);
@@ -78,10 +78,10 @@ void TestSignalUpdateReachesRealPenumbraTreeThroughFullStack() {
     const iris::MountFn Mount = MakeMountFn(BuildContext{});
 
     iris::Signal<bool> Show = false;
-    IrisComponent       RootNode = MakeFrame({
+    Component       RootNode = MakeFrame({
         MakeText("before"),
         MakeSlot(Iris::MakeSlotCallable(
-            [&]() -> IrisComponent { return Show.get() ? MakeText("shown") : IrisComponent(nullptr); })),
+            [&]() -> Component { return Show.get() ? MakeText("shown") : Component(nullptr); })),
         MakeText("after"),
     });
     std::unique_ptr<Umbra::IWidget> Root = Mount(RootNode);

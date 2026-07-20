@@ -16,7 +16,7 @@
 
 #include "Lustre/Parser.h"
 
-#include "Iris/IrisComponent.h"
+#include "Iris/Component.h"
 
 #include "Penumbra/Platform/PlatformWindow.h"
 #include "Penumbra/Render/Renderer.h"
@@ -77,9 +77,9 @@ void SaveScreenshot(SDL_Renderer* SdlRenderer, const std::string& Path) {
     SDL_DestroySurface(Frame);
 }
 
-Iris::IrisComponent MakeNode(Iris::IrisElementTag Tag, Iris::IrisProps Props = {},
-                              std::vector<Iris::IrisComponent> Children = {}) {
-    return Iris::IrisComponent(Tag, std::move(Props), std::move(Children), nullptr);
+Iris::Component MakeNode(Iris::IrisElementTag Tag, Iris::IrisProps Props = {},
+                              std::vector<Iris::Component> Children = {}) {
+    return Iris::Component(Tag, std::move(Props), std::move(Children), nullptr);
 }
 
 Iris::IrisProps WithClass(const std::string& ClassName) {
@@ -88,13 +88,13 @@ Iris::IrisProps WithClass(const std::string& ClassName) {
     return Props;
 }
 
-// The bar's own IrisComponent subtree -- the part this demo's stylesheet targets.
+// The bar's own Component subtree -- the part this demo's stylesheet targets.
 // `BarClass` is the one thing that changes between mount and a later click, matching
 // HealthBar.iris's own `barClass` local in the spec's worked example.
-Iris::IrisComponent MakeHealthBarNode(const std::string& BarClass) {
-    std::vector<Iris::IrisComponent> BarChildren;
+Iris::Component MakeHealthBarNode(const std::string& BarClass) {
+    std::vector<Iris::Component> BarChildren;
     BarChildren.push_back(MakeNode(Iris::IrisElementTag::Text, WithClass("bar-label")));
-    std::vector<Iris::IrisComponent> Children;
+    std::vector<Iris::Component> Children;
     Children.push_back(MakeNode(Iris::IrisElementTag::Frame, WithClass(BarClass), std::move(BarChildren)));
     return MakeNode(Iris::IrisElementTag::Frame, WithClass("health-bar"), std::move(Children));
 }
