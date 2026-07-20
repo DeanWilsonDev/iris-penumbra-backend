@@ -167,6 +167,29 @@ void TestIconPicksUpIconBackendFromBuildContext() {
            "IconWidget::IconBackend is populated from BuildContext.IconBackend");
 }
 
+void TestIconSizeOverridesTheDefault() {
+    IrisProps Props;
+    Props["icon"] = IrisPropValue{std::string("chevron-down")};
+    Props["size"] = IrisPropValue{14.0f};
+    const auto Node = MakeNode(IrisElementTag::Icon, Props);
+
+    const auto Built = BuildWidgetTree(Node, BuildContext{});
+    const auto* AsIcon = dynamic_cast<IconWidget*>(Built.get());
+    Expect(AsIcon != nullptr && AsIcon->SizeLogical == 14.0f,
+           "the size prop reaches IconWidget::SizeLogical, overriding its 16px default");
+}
+
+void TestIconWithNoSizePropKeepsTheDefault() {
+    IrisProps Props;
+    Props["icon"] = IrisPropValue{std::string("chevron-down")};
+    const auto Node = MakeNode(IrisElementTag::Icon, Props);
+
+    const auto Built = BuildWidgetTree(Node, BuildContext{});
+    const auto* AsIcon = dynamic_cast<IconWidget*>(Built.get());
+    Expect(AsIcon != nullptr && AsIcon->SizeLogical == 16.0f,
+           "an absent size prop leaves IconWidget::SizeLogical at its own default (Builder::size() never called)");
+}
+
 void TestNestedTreeBuildsRecursively() {
     // <Frame class="party-row"><HealthBar-shaped Frame/></Frame> — a small stand-in for
     // the spec §9 PartyScreen shape, since <HealthBar> itself is a component invocation
@@ -205,6 +228,8 @@ void RunWalkerTests() {
     TestImageBuildsWithoutLoadingWhenNoBackendProvided();
     TestIconBuildsWithIconNameEvenWithoutBackendProvided();
     TestIconPicksUpIconBackendFromBuildContext();
+    TestIconSizeOverridesTheDefault();
+    TestIconWithNoSizePropKeepsTheDefault();
     TestNestedTreeBuildsRecursively();
 }
 

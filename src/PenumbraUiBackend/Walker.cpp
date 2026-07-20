@@ -37,6 +37,17 @@ std::optional<std::string> GetStringProp(const IrisProps& Props, const std::stri
     return std::nullopt;
 }
 
+std::optional<float> GetFloatProp(const IrisProps& Props, const std::string& Name) {
+    const auto It = Props.find(Name);
+    if (It == Props.end()) {
+        return std::nullopt;
+    }
+    if (const auto* Value = std::get_if<float>(&It->second)) {
+        return *Value;
+    }
+    return std::nullopt;
+}
+
 std::optional<std::function<void()>> GetEventProp(const IrisProps& Props, const std::string& Name) {
     const auto It = Props.find(Name);
     if (It == Props.end()) {
@@ -213,7 +224,10 @@ std::unique_ptr<WidgetBase> BuildImage(const Component& Node, const BuildContext
 // below in BuildText, not through the Builder), set here from `Context.IconBackend` so
 // Draw() can resolve the icon name fresh every frame. Building still succeeds with
 // `Context.IconBackend` left null (e.g. a structural test with no real backend) — the
-// widget just never draws anything.
+// widget just never draws anything. `size`, if present, overrides
+// `IconWidget::SizeLogical`'s 16px default (docs/iris_core_spec.md §3.1) — omitted
+// leaves the built widget at that default, same "absent prop -> builder method never
+// called" treatment every other optional prop here gets.
 std::unique_ptr<WidgetBase> BuildIcon(const Component& Node, const BuildContext& Context) {
     IconWidget::Builder Builder;
     if (const auto ClassName = GetStringProp(Node.Props, "class")) {
@@ -221,6 +235,9 @@ std::unique_ptr<WidgetBase> BuildIcon(const Component& Node, const BuildContext&
     }
     if (const auto Icon = GetStringProp(Node.Props, "icon")) {
         Builder.icon(*Icon);
+    }
+    if (const auto Size = GetFloatProp(Node.Props, "size")) {
+        Builder.size(*Size);
     }
     std::unique_ptr<IconWidget> Built = Builder.build();
     Built->IconBackend = Context.IconBackend;
