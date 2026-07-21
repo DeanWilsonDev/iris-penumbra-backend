@@ -63,7 +63,7 @@ void TestUnsetPropertiesLeaveExistingFieldsUntouched() {
            "a property the resolved style never set is left untouched, not reset to a default");
 }
 
-void TestHoverOverlayReachesButtonOnlyOnButtonWidgets() {
+void TestHoverOverlayReachesAButtonWidget() {
     Button                  WidgetButton;
     ::Lustre::ResolvedStyle Style = MakeStyle();
     Style.Hover = std::make_shared<::Lustre::ResolvedStyle>();
@@ -79,12 +79,11 @@ void TestHoverOverlayReachesButtonOnlyOnButtonWidgets() {
     Expect(WidgetButton.Style.ColorBackground.R == 0xE8, "the base style still applies alongside the hover overlay");
 }
 
-void TestHoverOverlayIsStubbedOnAPlainBox() {
-    // BoxStyle carries the interaction-state fields now (Penumbra dd1d6ab),
-    // but Apply()'s pseudo-class overlay is still gated to Button only -- a
-    // :hover rule on a Frame-classed plain Box resolves into the IR (Lustre's
-    // job) but Apply() doesn't route it anywhere yet. Apply() should simply
-    // not crash or misapply it.
+void TestHoverOverlayReachesAPlainBoxToo() {
+    // BoxStyle::ColorBackgroundHovered/Pressed/Disabled are universal (not
+    // Button-only) since Penumbra dd1d6ab, and Box::BackgroundForState
+    // already renders them for any Box -- Apply()'s pseudo-class overlay is
+    // no longer gated to Button, see docs/pseudo_class_plain_box_decision.md.
     Box                      WidgetBox;
     ::Lustre::ResolvedStyle  Style;
     Style.Hover = std::make_shared<::Lustre::ResolvedStyle>();
@@ -93,7 +92,8 @@ void TestHoverOverlayIsStubbedOnAPlainBox() {
     LustreStyleApplier Applier;
     Applier.Apply(WidgetBox, Style);
 
-    Expect(WidgetBox.Style.ColorBackground.A == 0, "a :hover-only style with no base leaves Box::Style at its default");
+    Expect(WidgetBox.Style.ColorBackgroundHovered.R == 0x66 && WidgetBox.Style.ColorBackgroundHovered.G == 0xBB,
+           ":hover background-color reaches a plain Box::Style.ColorBackgroundHovered too");
 }
 
 void TestTextColorReachesALabel() {
@@ -253,8 +253,8 @@ void TestCheckboxStillReceivesItsBoxStyleSlice() {
 void RunLustreStyleApplierTests() {
     TestBoxStyleReachesAPlainBox();
     TestUnsetPropertiesLeaveExistingFieldsUntouched();
-    TestHoverOverlayReachesButtonOnlyOnButtonWidgets();
-    TestHoverOverlayIsStubbedOnAPlainBox();
+    TestHoverOverlayReachesAButtonWidget();
+    TestHoverOverlayReachesAPlainBoxToo();
     TestTextColorReachesALabel();
     TestDisplayStackWithRowFlexDirectionMapsToHorizontalStack();
     TestDisplayStackWithColumnFlexDirectionMapsToVerticalStack();

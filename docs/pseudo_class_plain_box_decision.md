@@ -1,10 +1,15 @@
 # penumbra-ui-backend — `:hover`/`:active`/`:disabled` background-color should reach any `Box`, not just `Button`
 
-> **Status:** Open — decision needed, not yet implemented. Flagged rather
-> than silently picked in `docs/next_steps.md`'s 2026-07-21 entry (fixing
-> `StyleApplier.cpp` against `penumbra`'s current `Button` API surfaced
-> this as a real, no-longer-true assumption baked into the code) — this
-> doc is the follow-up record.
+> **Status:** Implemented, per "1. Widen the pseudo-class guard to `Box`"
+> below — `StyleApplier.cpp`'s pseudo-class overlay now applies through
+> `AsBox` instead of a separate `dynamic_cast<Button*>`, `Button`'s
+> include/using-decl removed as dead. `tests/LustreStyleApplierTests.cpp`'s
+> two affected tests renamed and flipped (`TestHoverOverlayReachesAButtonWidget`,
+> `TestHoverOverlayReachesAPlainBoxToo`) — full suite passing. Originally
+> flagged rather than silently picked in `docs/next_steps.md`'s 2026-07-21
+> entry (fixing `StyleApplier.cpp` against `penumbra`'s current `Button`
+> API surfaced this as a real, no-longer-true assumption baked into the
+> code) — this doc is the follow-up record.
 > **Trigger:** `penumbra@dd1d6ab` ("Move interaction-state colors onto
 > BoxStyle; give Box hover/pressed/disabled styling") moved
 > `ColorBackgroundHovered`/`ColorBackgroundPressed`/`ColorBackgroundDisabled`

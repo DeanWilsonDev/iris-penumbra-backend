@@ -1,7 +1,6 @@
 #include "PenumbraUiBackend/Lustre/StyleApplier.h"
 
 #include "Penumbra/Widgets/Box.h"
-#include "Penumbra/Widgets/Button.h"
 #include "Penumbra/Widgets/Checkbox.h"
 #include "Penumbra/Widgets/Label.h"
 
@@ -103,7 +102,6 @@ Penumbra::Render::FontHandle LustreStyleApplier::ResolveFont(const ::Lustre::Fon
 
 void LustreStyleApplier::Apply(Penumbra::Widgets::WidgetBase& Widget, const ::Lustre::ResolvedStyle& Style) const {
     using Penumbra::Widgets::Box;
-    using Penumbra::Widgets::Button;
     using Penumbra::Widgets::Checkbox;
     using Penumbra::Widgets::Label;
 
@@ -119,21 +117,19 @@ void LustreStyleApplier::Apply(Penumbra::Widgets::WidgetBase& Widget, const ::Lu
     ApplyBoxStyle(AsBox->Style, Style);
     ApplyLayout(*AsBox, Style);
 
-    // §2's "Pseudo-class-scoped variants": only background-color has a real
-    // field to receive a pseudo-scoped value today, and only on Button.
-    // :hover/:active/:disabled targeting anything else resolves into the IR
-    // (Lustre's own job) but has nowhere to land here yet -- stubbed, see
-    // penumbra-proto/docs/lustre_style_gaps_requirements.md §1.
-    if (auto* AsButton = dynamic_cast<Button*>(&Widget)) {
-        if (Style.Hover && Style.Hover->BackgroundColor) {
-            AsButton->Style.ColorBackgroundHovered = ToPenumbraColor(*Style.Hover->BackgroundColor);
-        }
-        if (Style.Active && Style.Active->BackgroundColor) {
-            AsButton->Style.ColorBackgroundPressed = ToPenumbraColor(*Style.Active->BackgroundColor);
-        }
-        if (Style.Disabled && Style.Disabled->BackgroundColor) {
-            AsButton->Style.ColorBackgroundDisabled = ToPenumbraColor(*Style.Disabled->BackgroundColor);
-        }
+    // §2's "Pseudo-class-scoped variants": background-color is universal
+    // (BoxStyle::ColorBackgroundHovered/Pressed/Disabled, not Button-only --
+    // penumbra@dd1d6ab moved these off Button onto BoxStyle specifically so
+    // any classed Box renders them, see Box::BackgroundForState), so this
+    // reuses AsBox rather than re-narrowing to Button.
+    if (Style.Hover && Style.Hover->BackgroundColor) {
+        AsBox->Style.ColorBackgroundHovered = ToPenumbraColor(*Style.Hover->BackgroundColor);
+    }
+    if (Style.Active && Style.Active->BackgroundColor) {
+        AsBox->Style.ColorBackgroundPressed = ToPenumbraColor(*Style.Active->BackgroundColor);
+    }
+    if (Style.Disabled && Style.Disabled->BackgroundColor) {
+        AsBox->Style.ColorBackgroundDisabled = ToPenumbraColor(*Style.Disabled->BackgroundColor);
     }
 
     if (auto* AsLabel = dynamic_cast<Label*>(&Widget)) {
