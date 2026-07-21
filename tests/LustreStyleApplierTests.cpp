@@ -96,6 +96,67 @@ void TestHoverOverlayReachesAPlainBoxToo() {
            ":hover background-color reaches a plain Box::Style.ColorBackgroundHovered too");
 }
 
+void TestHoverAndActiveGradientOverlaysReachBoxStyle() {
+    Box                     WidgetBox;
+    ::Lustre::ResolvedStyle Style = MakeStyle();
+    Style.Hover = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Hover->BackgroundGradientStart = ::Lustre::Color{0x4A, 0x90, 0xFF, 0xFF};
+    Style.Hover->BackgroundGradientEnd = ::Lustre::Color{0x2A, 0x5A, 0xDD, 0xFF};
+    Style.Active = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Active->BackgroundGradientStart = ::Lustre::Color{0x1A, 0x40, 0xAA, 0xFF};
+    Style.Active->BackgroundGradientEnd = ::Lustre::Color{0x0A, 0x20, 0x66, 0xFF};
+
+    LustreStyleApplier Applier;
+    Applier.Apply(WidgetBox, Style);
+
+    Expect(WidgetBox.Style.GradientTopHovered.R == 0x4A && WidgetBox.Style.GradientTopHovered.B == 0xFF,
+           ":hover background-gradient-start reaches Box::Style.GradientTopHovered");
+    Expect(WidgetBox.Style.GradientBottomHovered.R == 0x2A && WidgetBox.Style.GradientBottomHovered.B == 0xDD,
+           ":hover background-gradient-end reaches Box::Style.GradientBottomHovered");
+    Expect(WidgetBox.Style.GradientTopPressed.R == 0x1A && WidgetBox.Style.GradientTopPressed.B == 0xAA,
+           ":active background-gradient-start reaches Box::Style.GradientTopPressed");
+    Expect(WidgetBox.Style.GradientBottomPressed.R == 0x0A && WidgetBox.Style.GradientBottomPressed.B == 0x66,
+           ":active background-gradient-end reaches Box::Style.GradientBottomPressed");
+}
+
+void TestNoGradientOverlayLeavesPerStateGradientFieldsAtDefault() {
+    Box                     WidgetBox;
+    ::Lustre::ResolvedStyle Style = MakeStyle();
+    Style.Hover = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Hover->BackgroundColor = ::Lustre::Color{0x66, 0xBB, 0x6A, 0xFF}; // no gradient in the overlay
+
+    LustreStyleApplier Applier;
+    Applier.Apply(WidgetBox, Style);
+
+    Expect(WidgetBox.Style.GradientTopHovered.A == 0,
+           "a :hover overlay with no gradient leaves Box::Style.GradientTopHovered at its zero-alpha default");
+}
+
+void TestBoxShadowReachesBoxStyle() {
+    Box                     WidgetBox;
+    ::Lustre::ResolvedStyle Style = MakeStyle();
+    Style.ShadowColor = ::Lustre::Color{0x00, 0x00, 0x00, 0xAA};
+    Style.ShadowBlurRadiusLogical = 12.0F;
+
+    LustreStyleApplier Applier;
+    Applier.Apply(WidgetBox, Style);
+
+    Expect(WidgetBox.Style.ShadowColor.A == 0xAA, "box-shadow color reaches Box::Style.ShadowColor");
+    Expect(WidgetBox.Style.ShadowBlurRadiusLogical == 12.0F,
+           "box-shadow blur radius reaches Box::Style.ShadowBlurRadiusLogical");
+}
+
+void TestNoBoxShadowLeavesBoxStyleShadowFieldsAtDefault() {
+    Box        WidgetBox;
+    const auto Style = MakeStyle(); // sets BackgroundColor, no box-shadow
+
+    LustreStyleApplier Applier;
+    Applier.Apply(WidgetBox, Style);
+
+    Expect(WidgetBox.Style.ShadowBlurRadiusLogical == 0.0F,
+           "no box-shadow in the style leaves Box::Style.ShadowBlurRadiusLogical at its zero default");
+}
+
 void TestTextColorReachesALabel() {
     Label                    WidgetLabel;
     ::Lustre::ResolvedStyle  Style;
@@ -255,6 +316,10 @@ void RunLustreStyleApplierTests() {
     TestUnsetPropertiesLeaveExistingFieldsUntouched();
     TestHoverOverlayReachesAButtonWidget();
     TestHoverOverlayReachesAPlainBoxToo();
+    TestHoverAndActiveGradientOverlaysReachBoxStyle();
+    TestNoGradientOverlayLeavesPerStateGradientFieldsAtDefault();
+    TestBoxShadowReachesBoxStyle();
+    TestNoBoxShadowLeavesBoxStyleShadowFieldsAtDefault();
     TestTextColorReachesALabel();
     TestDisplayStackWithRowFlexDirectionMapsToHorizontalStack();
     TestDisplayStackWithColumnFlexDirectionMapsToVerticalStack();

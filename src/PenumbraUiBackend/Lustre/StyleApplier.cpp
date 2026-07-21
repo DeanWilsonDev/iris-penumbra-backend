@@ -82,6 +82,13 @@ void ApplyBoxStyle(Penumbra::Widgets::BoxStyle& Target, const ::Lustre::Resolved
     if (Style.Margin) {
         Target.Margin = ToPenumbraEdgeInsets(*Style.Margin);
     }
+    // Same pair convention as BackgroundGradientStart/End above: the resolver
+    // only ever sets both halves of `box-shadow` together (or neither), so
+    // checking ShadowColor alone is enough.
+    if (Style.ShadowColor) {
+        Target.ShadowColor = ToPenumbraColor(*Style.ShadowColor);
+        Target.ShadowBlurRadiusLogical = Style.ShadowBlurRadiusLogical.value_or(0.0f);
+    }
 }
 
 } // namespace
@@ -130,6 +137,19 @@ void LustreStyleApplier::Apply(Penumbra::Widgets::WidgetBase& Widget, const ::Lu
     }
     if (Style.Disabled && Style.Disabled->BackgroundColor) {
         AsBox->Style.ColorBackgroundDisabled = ToPenumbraColor(*Style.Disabled->BackgroundColor);
+    }
+
+    // Per-state gradient overrides -- same pair convention as the flat
+    // GradientTop/Bottom above, and no Disabled variant for the same reason
+    // (penumbra@89216b4: every known consumer falls back to a flat
+    // ColorBackgroundDisabled fill when disabled, not a disabled gradient).
+    if (Style.Hover && Style.Hover->BackgroundGradientStart) {
+        AsBox->Style.GradientTopHovered = ToPenumbraColor(*Style.Hover->BackgroundGradientStart);
+        AsBox->Style.GradientBottomHovered = ToPenumbraColor(*Style.Hover->BackgroundGradientEnd);
+    }
+    if (Style.Active && Style.Active->BackgroundGradientStart) {
+        AsBox->Style.GradientTopPressed = ToPenumbraColor(*Style.Active->BackgroundGradientStart);
+        AsBox->Style.GradientBottomPressed = ToPenumbraColor(*Style.Active->BackgroundGradientEnd);
     }
 
     if (auto* AsLabel = dynamic_cast<Label*>(&Widget)) {

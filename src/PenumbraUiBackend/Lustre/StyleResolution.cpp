@@ -11,6 +11,8 @@ namespace {
 // calls this file composes rather than within a single Resolver::Resolve().
 void MergeInto(::Lustre::ResolvedStyle& Base, const ::Lustre::ResolvedStyle& Overlay) {
     if (Overlay.BackgroundColor) Base.BackgroundColor = Overlay.BackgroundColor;
+    if (Overlay.BackgroundGradientStart) Base.BackgroundGradientStart = Overlay.BackgroundGradientStart;
+    if (Overlay.BackgroundGradientEnd) Base.BackgroundGradientEnd = Overlay.BackgroundGradientEnd;
     if (Overlay.BorderColor) Base.BorderColor = Overlay.BorderColor;
     if (Overlay.BorderWidth) Base.BorderWidth = Overlay.BorderWidth;
     if (Overlay.BorderRadius) Base.BorderRadius = Overlay.BorderRadius;
@@ -23,8 +25,12 @@ void MergeInto(::Lustre::ResolvedStyle& Base, const ::Lustre::ResolvedStyle& Ove
     if (Overlay.Gap) Base.Gap = Overlay.Gap;
     if (Overlay.AlignItems) Base.AlignItems = Overlay.AlignItems;
     if (Overlay.Transition) Base.Transition = Overlay.Transition;
+    if (Overlay.ShadowColor) Base.ShadowColor = Overlay.ShadowColor;
+    if (Overlay.ShadowBlurRadiusLogical) Base.ShadowBlurRadiusLogical = Overlay.ShadowBlurRadiusLogical;
     if (Overlay.WidthLogical) Base.WidthLogical = Overlay.WidthLogical;
     if (Overlay.HeightLogical) Base.HeightLogical = Overlay.HeightLogical;
+    if (Overlay.MaxWidthLogical) Base.MaxWidthLogical = Overlay.MaxWidthLogical;
+    if (Overlay.TextOverflowMode) Base.TextOverflowMode = Overlay.TextOverflowMode;
     if (Overlay.TransformScale) Base.TransformScale = Overlay.TransformScale;
 
     auto MergeOverlayBlock = [](std::shared_ptr<::Lustre::ResolvedStyle>&       BaseBlock,

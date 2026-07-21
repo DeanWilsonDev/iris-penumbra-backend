@@ -143,6 +143,31 @@ void TestMountMergesGlobalAndComponentLayers() {
            "the component file's own border-radius applies alongside global's background-color");
 }
 
+void TestMountMergesGradientAcrossGlobalAndComponentLayers() {
+    // Regression test for the MergeInto() gap where BackgroundGradientStart/
+    // End weren't copied field-by-field alongside BackgroundColor et al., so a
+    // gradient set only in global.lustre silently vanished once a component
+    // sheet was also merged in.
+    const ::Lustre::Stylesheet GlobalSheet =
+        ParseOrDie(".card { background-gradient-start: #4A90FF; background-gradient-end: #000000; }", "global.lustre");
+    const ::Lustre::Stylesheet ComponentSheet = ParseOrDie(".card { border-radius: 4px; }", "Card.lustre");
+
+    const LustreStyleApplier Applier;
+    const ::Lustre::StylesheetSet Sheets{&GlobalSheet, &ComponentSheet};
+    BuildContext Context;
+    Context.Style = &Sheets;
+    Context.StyleApplier = &Applier;
+
+    const auto Node = MakeNode(IrisElementTag::Frame, WithClass("card"));
+    const auto Built = BuildWidgetTree(Node, Context);
+    const auto* AsBox = dynamic_cast<Box*>(Built.get());
+
+    Expect(AsBox != nullptr && AsBox->Style.GradientTop.R == 0x4A && AsBox->Style.GradientTop.B == 0xFF,
+           "global.lustre's background-gradient-start still applies once merged with a component layer");
+    Expect(AsBox != nullptr && AsBox->Style.BorderRadius == 4.0F,
+           "the component file's own border-radius applies alongside global's gradient");
+}
+
 void TestClassChangeReResolvesAndAppliesTheNewStyle() {
     const ::Lustre::Stylesheet ComponentSheet = ParseOrDie(R"(
 .bar-normal {
@@ -314,6 +339,7 @@ void RunStyleWiringTests() {
     TestMountLeavesStyleUntouchedWhenNoContextIsSupplied();
     TestMountResolvesADescendantSelectorAcrossRealAncestry();
     TestMountMergesGlobalAndComponentLayers();
+    TestMountMergesGradientAcrossGlobalAndComponentLayers();
     TestClassChangeReResolvesAndAppliesTheNewStyle();
     TestClassChangeIsANoOpWithoutStyleContext();
     TestClassChangeOnANestedChildRespectsRealAncestryThroughTheWrapperTree();
