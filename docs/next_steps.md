@@ -4,13 +4,48 @@
 > the end of each work session; supersedes its own previous contents
 > rather than accumulating history (the individual gap/spec docs are the
 > durable record).
-> Last updated: 2026-07-21.
+> Last updated: 2026-07-22.
 
-## What's actually blocking downstream right now
+## Done this session (2026-07-22): `<Input>`'s `onTextChange` wired end to end
 
-Nothing known. Full build + `penumbra_ui_backend_tests` clean (0 failures).
+`vendor/iris` bumped `42cc09c` → `c92388b` ("Add `<Input>`'s onTextChange event and
+a live-widget root registry"), which itself needed `vendor/iris/libs/umbra-interfaces`
+re-initialized (`git submodule update --init --recursive` from inside `vendor/iris`) to
+pick up `Umbra::IrisPropDiff::OnTextChange` — a plain top-level `submodule update
+--init --recursive` alone doesn't follow a nested submodule bump, same lesson the
+previous `lustre`/`penumbra` bump already logged.
 
-## Done this session (2026-07-21, third pass): per-state gradient + box-shadow wired end to end
+With the pin current, both build-time and reconciler-side wiring landed:
+
+1. **Static build** (`Walker.cpp`): added `GetStringEventProp`, a sibling to
+   `GetEventProp` that extracts `IrisPropValue`'s `std::function<void(std::string)>`
+   alternative (`std::get_if` keyed on that exact variant member — the existing
+   zero-arg `GetEventProp` can't reach it). `BuildInput` now calls it for
+   `"onTextChange"` and assigns into `TextInput::OnTextChanged`, wrapped in a small
+   lambda to adapt the by-value `std::string` callback to `OnTextChanged`'s
+   `const std::string&` signature.
+2. **Reconciler-side update path** (`PenumbraWidgetAdapter.cpp`'s `ApplyPropDiff`):
+   added a `Diff.OnTextChange` branch using the same `dynamic_cast<TextInput*>` guard
+   pattern the existing `<Text>`-only `Diff.Text` and `<Image>`-only `Diff.Src`
+   branches already use (since `OnTextChanged` lives on `TextInput` specifically, not
+   on `WidgetBase` like the other five event props above it).
+
+New regression coverage: `tests/WalkerTests.cpp`
+(`TestInputOnTextChangeReachesTextInputOnTextChanged` — prop reaches
+`TextInput::OnTextChanged` and invoking it calls back into the original handler) and
+`tests/PenumbraWidgetAdapterTests.cpp`
+(`TestApplyPropDiffOnTextChangeReachesRealTextInput` — same, via `ApplyPropDiff` against
+a real mounted `TextInput`, not just the static build). Full build + both test
+binaries (`penumbra_ui_backend_tests`, `test_iris`) clean — 0 failures.
+
+**What this unblocks**: `pharos-proto`'s toolbar JSON-path field ("Toolbar's
+`TextInput` root not componentized", `pharos-proto/docs/next_steps.md`) can now be
+compiled from a `.iris`/`.lustre` pair instead of hand-built — swapping in `<Input>`
+no longer regresses live typing, since `onTextChange` (not just the initial-value-only
+`text` prop) now reaches the real widget both at first build and across reconciles.
+That componentization is `pharos-proto`'s own follow-up, nothing further needed here.
+
+## Done previous session (2026-07-21, third pass): per-state gradient + box-shadow wired end to end
 
 `penumbra` (bumped to `89216b4`) and `lustre` (bumped to `db6d4db`) landed the
 two primitives the previous pass was blocked on — `BoxStyle::GradientTopHovered/

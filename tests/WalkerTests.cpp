@@ -253,6 +253,24 @@ void TestInputPicksUpFocusAndClipboardFromBuildContext() {
            "TextInput::Focus/Clipboard are populated from BuildContext");
 }
 
+void TestInputOnTextChangeReachesTextInputOnTextChanged() {
+    std::string LastValue;
+    IrisProps   Props;
+    Props["onTextChange"] = IrisPropValue{std::function<void(std::string)>([&LastValue](std::string NewText) {
+        LastValue = std::move(NewText);
+    })};
+    const auto Node = MakeNode(IrisElementTag::Input, Props);
+
+    const auto Built = BuildWidgetTree(Node, BuildContext{});
+    const auto* AsInput = dynamic_cast<TextInput*>(Built.get());
+    Expect(AsInput != nullptr && static_cast<bool>(AsInput->OnTextChanged),
+           "the onTextChange prop reaches TextInput::OnTextChanged");
+    if (AsInput != nullptr && AsInput->OnTextChanged) {
+        AsInput->OnTextChanged("typed");
+        Expect(LastValue == "typed", "invoking TextInput::OnTextChanged calls through to the onTextChange callback");
+    }
+}
+
 void TestNestedTreeBuildsRecursively() {
     // <Frame class="party-row"><HealthBar-shaped Frame/></Frame> — a small stand-in for
     // the spec §9 PartyScreen shape, since <HealthBar> itself is a component invocation
@@ -297,6 +315,7 @@ void RunWalkerTests() {
     TestScrollWithNoWheelStepKeepsTheDefault();
     TestInputBuildsATextInputWithTextAndPreferredWidth();
     TestInputPicksUpFocusAndClipboardFromBuildContext();
+    TestInputOnTextChangeReachesTextInputOnTextChanged();
     TestNestedTreeBuildsRecursively();
 }
 

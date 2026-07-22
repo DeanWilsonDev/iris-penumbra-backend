@@ -5,6 +5,7 @@
 
 #include "Penumbra/Widgets/Box.h"
 #include "Penumbra/Widgets/Label.h"
+#include "Penumbra/Widgets/TextInput.h"
 
 #include <cstdio>
 #include <string>
@@ -32,6 +33,7 @@ using PenumbraUiBackend::PenumbraWidget;
 using PenumbraUiBackend::WrapExistingTree;
 using Penumbra::Widgets::Box;
 using Penumbra::Widgets::Label;
+using Penumbra::Widgets::TextInput;
 
 Component MakeFrame(const std::string& ClassName, std::vector<Component> Children = {},
                          std::optional<IrisPropValue> Key = std::nullopt) {
@@ -77,6 +79,28 @@ void TestApplyPropDiffReachesRealWidgetBaseFields() {
     Expect(static_cast<bool>(AsBox->OnPressed), "ApplyPropDiff's OnPress reaches the real WidgetBase field");
     AsBox->OnPressed();
     Expect(Pressed, "and invoking it calls back into the original handler");
+}
+
+void TestApplyPropDiffOnTextChangeReachesRealTextInput() {
+    const iris::MountFn Mount = MakeMountFn(BuildContext{});
+    const Component     InputNode(IrisElementTag::Input, IrisProps{}, {}, nullptr);
+    std::unique_ptr<Umbra::IWidget> Wrapped = Mount(InputNode);
+
+    std::string          LastValue;
+    Umbra::IrisPropDiff Diff;
+    Diff.OnTextChange = std::function<void(std::string)>([&LastValue](std::string NewText) {
+        LastValue = std::move(NewText);
+    });
+    Wrapped->ApplyPropDiff(Diff);
+
+    auto* AsPenumbra = dynamic_cast<PenumbraWidget*>(Wrapped.get());
+    auto* AsTextInput = dynamic_cast<TextInput*>(AsPenumbra->RawWidget());
+    Expect(AsTextInput != nullptr && static_cast<bool>(AsTextInput->OnTextChanged),
+           "ApplyPropDiff's OnTextChange reaches the real TextInput::OnTextChanged field");
+    if (AsTextInput != nullptr && AsTextInput->OnTextChanged) {
+        AsTextInput->OnTextChanged("typed");
+        Expect(LastValue == "typed", "and invoking it calls back into the original handler");
+    }
 }
 
 void TestReconcilerUpdatesRealWidgetTreeInPlace() {
@@ -139,6 +163,7 @@ void TestSignalDrivesRealPenumbraTreeThroughFullStack() {
 void RunPenumbraWidgetAdapterTests() {
     TestWrapExistingTreeMirrorsRealTreeStructure();
     TestApplyPropDiffReachesRealWidgetBaseFields();
+    TestApplyPropDiffOnTextChangeReachesRealTextInput();
     TestReconcilerUpdatesRealWidgetTreeInPlace();
     TestReconcilerAddsRealChildToRealParentBox();
     TestSignalDrivesRealPenumbraTreeThroughFullStack();

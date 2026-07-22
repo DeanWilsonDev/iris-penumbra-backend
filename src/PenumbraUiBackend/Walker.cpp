@@ -95,6 +95,21 @@ std::optional<std::function<void()>> GetEventProp(const IrisProps& Props, const 
     return std::nullopt;
 }
 
+// Sibling to GetEventProp for the value-carrying event variant `<Input>`'s
+// onTextChange needs (IrisPropValue's std::function<void(std::string)> alternative,
+// docs/iris_core_spec.md's <Input> section) -- the zero-arg GetEventProp above can't
+// extract this one, std::get_if is keyed on the exact alternative type.
+std::optional<std::function<void(std::string)>> GetStringEventProp(const IrisProps& Props, const std::string& Name) {
+    const auto It = Props.find(Name);
+    if (It == Props.end()) {
+        return std::nullopt;
+    }
+    if (const auto* Value = std::get_if<std::function<void(std::string)>>(&It->second)) {
+        return *Value;
+    }
+    return std::nullopt;
+}
+
 // <Scroll>/<Input> both build to a WidgetBase subclass with no Builder of its own
 // (ScrollablePanel.h/TextInput.h -- unlike every other Core primitive here). Shared
 // props (class, event props) are WidgetBase's own plain public fields
@@ -351,6 +366,10 @@ std::unique_ptr<WidgetBase> BuildInput(const Component& Node, const BuildContext
     }
     if (const auto PreferredWidth = GetFloatProp(Node.Props, "preferredWidth")) {
         Built->PreferredWidthLogical = *PreferredWidth;
+    }
+    if (const auto OnTextChange = GetStringEventProp(Node.Props, "onTextChange")) {
+        std::function<void(std::string)> Callback = *OnTextChange;
+        Built->OnTextChanged = [Callback](const std::string& NewText) { Callback(NewText); };
     }
     Built->FontBackend = Context.FontBackend;
     Built->Font = Context.Font;

@@ -6,6 +6,7 @@
 #include "Penumbra/Widgets/ImageWidget.h"
 #include "Penumbra/Widgets/InlineContainer.h"
 #include "Penumbra/Widgets/Label.h"
+#include "Penumbra/Widgets/TextInput.h"
 
 #include <algorithm>
 
@@ -15,6 +16,7 @@ using Penumbra::Widgets::Box;
 using Penumbra::Widgets::ImageWidget;
 using Penumbra::Widgets::InlineContainer;
 using Penumbra::Widgets::Label;
+using Penumbra::Widgets::TextInput;
 using Penumbra::Widgets::WidgetBase;
 
 namespace {
@@ -162,6 +164,16 @@ void PenumbraWidget::ApplyPropDiff(const Umbra::IrisPropDiff& Diff) {
     if (Diff.Text) {
         if (auto* AsLabel = dynamic_cast<Label*>(Widget)) {
             AsLabel->Text = *Diff.Text;
+        }
+    }
+
+    // <Input>-only -- OnTextChanged lives on TextInput specifically, not WidgetBase
+    // (unlike OnPress/OnRelease/OnHover/OnFocus/OnChange above), same dynamic_cast
+    // guard the Text/Src branches around this one already use.
+    if (Diff.OnTextChange) {
+        if (auto* AsTextInput = dynamic_cast<TextInput*>(Widget)) {
+            std::function<void(std::string)> Callback = *Diff.OnTextChange;
+            AsTextInput->OnTextChanged = [Callback](const std::string& NewText) { Callback(NewText); };
         }
     }
 
