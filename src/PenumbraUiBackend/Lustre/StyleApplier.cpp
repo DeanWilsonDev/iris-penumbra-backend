@@ -139,6 +139,19 @@ void LustreStyleApplier::Apply(Penumbra::Widgets::WidgetBase& Widget, const ::Lu
         AsBox->Style.ColorBackgroundDisabled = ToPenumbraColor(*Style.Disabled->BackgroundColor);
     }
 
+    // border-color's per-state overlay -- same universal-on-BoxStyle treatment
+    // as background-color above (penumbra@7fad4dc: ColorBorderHovered/Pressed/
+    // Disabled plus Box::BorderForState).
+    if (Style.Hover && Style.Hover->BorderColor) {
+        AsBox->Style.ColorBorderHovered = ToPenumbraColor(*Style.Hover->BorderColor);
+    }
+    if (Style.Active && Style.Active->BorderColor) {
+        AsBox->Style.ColorBorderPressed = ToPenumbraColor(*Style.Active->BorderColor);
+    }
+    if (Style.Disabled && Style.Disabled->BorderColor) {
+        AsBox->Style.ColorBorderDisabled = ToPenumbraColor(*Style.Disabled->BorderColor);
+    }
+
     // Per-state gradient overrides -- same pair convention as the flat
     // GradientTop/Bottom above, and no Disabled variant for the same reason
     // (penumbra@89216b4: every known consumer falls back to a flat

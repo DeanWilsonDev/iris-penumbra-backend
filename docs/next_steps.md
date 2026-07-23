@@ -4,9 +4,45 @@
 > the end of each work session; supersedes its own previous contents
 > rather than accumulating history (the individual gap/spec docs are the
 > durable record).
-> Last updated: 2026-07-22.
+> Last updated: 2026-07-23.
 
-## Done this session (2026-07-22): `<Input>`'s `onTextChange` wired end to end
+## Done this session (2026-07-23): `border-color`'s `:hover`/`:active`/`:disabled` wiring in `StyleApplier`
+
+Bumped the `vendor/penumbra` pin `89216b4` → `7fad4dc` ("Add
+ColorBorder*/BorderForState and WidgetBase::OnDestroyed") to pick up
+`BoxStyle::ColorBorderHovered`/`ColorBorderPressed`/`ColorBorderDisabled`
+and `Box::BorderForState()`. No nested-submodule-init step was needed this
+time — `penumbra` itself has no submodules, unlike the `lustre`/`iris`
+bumps logged in earlier sessions below.
+
+`StyleApplier.cpp`'s `Apply()` now has a per-state `border-color` block
+right next to the existing `background-color` one, mirroring it exactly:
+`Style.Hover->BorderColor` → `ColorBorderHovered`, `Style.Active->BorderColor`
+→ `ColorBorderPressed`, `Style.Disabled->BorderColor` → `ColorBorderDisabled`
+(same `ToPenumbraColor`/optional-presence convention, and — unlike the
+gradient overlays — this one does get a `:disabled` variant, since
+`ColorBorderDisabled` already existed as a flat color, not a gradient).
+Checked `StyleResolution.cpp`'s `MergeInto`: no gap there — pseudo-class
+overlays merge via a recursive `MergeOverlayBlock` call over the whole
+`Hover`/`Active`/`Disabled` sub-struct, so `BorderColor` was already
+covered as soon as the top-level field's `MergeInto` line existed (it did,
+from the flat `border-color` property).
+
+New regression coverage in `tests/LustreStyleApplierTests.cpp`:
+`TestHoverActiveAndDisabledBorderColorOverlaysReachBoxStyle` (all three
+overlays reach a plain `Box::Style`) and
+`TestNoBorderColorOverlayLeavesPerStateBorderFieldsAtDefault` (absence
+leaves the per-state fields at zero-alpha). Full build + `penumbra_ui_backend_tests`
+clean (0 failures).
+
+**What this unblocks**: `pharos-proto`'s `ColorFilterDropdown`'s
+`DropdownTrigger` (`pharos-proto/src/ui/color_filter_dropdown.cpp`) can now
+express its hover/open border-color swap as `:hover { border-color: ... }`
+in a `.lustre` file instead of doing it by hand each frame — the last
+blocker on that widget's `.iris`/`.lustre` migration. That migration is
+`pharos-proto`'s own follow-up, nothing further needed here.
+
+## Done previous session (2026-07-22): `<Input>`'s `onTextChange` wired end to end
 
 `vendor/iris` bumped `42cc09c` → `c92388b` ("Add `<Input>`'s onTextChange event and
 a live-widget root registry"), which itself needed `vendor/iris/libs/umbra-interfaces`

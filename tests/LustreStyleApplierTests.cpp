@@ -132,6 +132,43 @@ void TestNoGradientOverlayLeavesPerStateGradientFieldsAtDefault() {
            "a :hover overlay with no gradient leaves Box::Style.GradientTopHovered at its zero-alpha default");
 }
 
+void TestHoverActiveAndDisabledBorderColorOverlaysReachBoxStyle() {
+    // Mirrors TestHoverOverlayReachesAPlainBoxToo's ColorBackgroundHovered
+    // precedent: BoxStyle::ColorBorderHovered/Pressed/Disabled are universal
+    // (penumbra@7fad4dc), so a plain Box picks these up too.
+    Box                     WidgetBox;
+    ::Lustre::ResolvedStyle Style = MakeStyle();
+    Style.Hover = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Hover->BorderColor = ::Lustre::Color{0x66, 0xBB, 0x6A, 0xFF};
+    Style.Active = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Active->BorderColor = ::Lustre::Color{0x1A, 0x40, 0xAA, 0xFF};
+    Style.Disabled = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Disabled->BorderColor = ::Lustre::Color{0x80, 0x80, 0x80, 0xFF};
+
+    LustreStyleApplier Applier;
+    Applier.Apply(WidgetBox, Style);
+
+    Expect(WidgetBox.Style.ColorBorderHovered.R == 0x66 && WidgetBox.Style.ColorBorderHovered.G == 0xBB,
+           ":hover border-color reaches Box::Style.ColorBorderHovered");
+    Expect(WidgetBox.Style.ColorBorderPressed.R == 0x1A && WidgetBox.Style.ColorBorderPressed.B == 0xAA,
+           ":active border-color reaches Box::Style.ColorBorderPressed");
+    Expect(WidgetBox.Style.ColorBorderDisabled.R == 0x80 && WidgetBox.Style.ColorBorderDisabled.G == 0x80,
+           ":disabled border-color reaches Box::Style.ColorBorderDisabled");
+}
+
+void TestNoBorderColorOverlayLeavesPerStateBorderFieldsAtDefault() {
+    Box                     WidgetBox;
+    ::Lustre::ResolvedStyle Style = MakeStyle();
+    Style.Hover = std::make_shared<::Lustre::ResolvedStyle>();
+    Style.Hover->BackgroundColor = ::Lustre::Color{0x66, 0xBB, 0x6A, 0xFF}; // no border-color in the overlay
+
+    LustreStyleApplier Applier;
+    Applier.Apply(WidgetBox, Style);
+
+    Expect(WidgetBox.Style.ColorBorderHovered.A == 0,
+           "a :hover overlay with no border-color leaves Box::Style.ColorBorderHovered at its zero-alpha default");
+}
+
 void TestBoxShadowReachesBoxStyle() {
     Box                     WidgetBox;
     ::Lustre::ResolvedStyle Style = MakeStyle();
@@ -318,6 +355,8 @@ void RunLustreStyleApplierTests() {
     TestHoverOverlayReachesAPlainBoxToo();
     TestHoverAndActiveGradientOverlaysReachBoxStyle();
     TestNoGradientOverlayLeavesPerStateGradientFieldsAtDefault();
+    TestHoverActiveAndDisabledBorderColorOverlaysReachBoxStyle();
+    TestNoBorderColorOverlayLeavesPerStateBorderFieldsAtDefault();
     TestBoxShadowReachesBoxStyle();
     TestNoBoxShadowLeavesBoxStyleShadowFieldsAtDefault();
     TestTextColorReachesALabel();
