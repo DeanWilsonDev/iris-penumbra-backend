@@ -62,6 +62,19 @@ bool ResolvedStyleIsEmpty(const ::Lustre::ResolvedStyle& Style) {
            !Style.TextOverflowMode;
 }
 
+// `Node.Ref` mirrors `Node.Key` exactly (both `std::optional<IrisPropValue>`,
+// `Iris/Component.h`) -- extracts the plain string it always carries via real `.iris`
+// codegen. Returns nullopt for an unset ref or (defensively) a non-string value.
+std::optional<std::string> GetRefName(const Component& Node) {
+    if (!Node.Ref.has_value()) {
+        return std::nullopt;
+    }
+    if (const auto* Value = std::get_if<std::string>(&*Node.Ref)) {
+        return *Value;
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> GetStringProp(const IrisProps& Props, const std::string& Name) {
     const auto It = Props.find(Name);
     if (It == Props.end()) {
@@ -183,7 +196,7 @@ private:
 
 std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const BuildContext& Context,
                                                      const WalkerStyleElement* ParentStyleElement,
-                                                     bool IsComponentRoot, PrimitiveTagMap* OutTags,
+                                                     bool IsComponentRoot, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                                                      StyleMatchStats* Stats);
 
 // The five event props plus `class` are the exact shared method set every Box-derived
@@ -220,22 +233,22 @@ void ApplySharedProps(BuilderT& Builder, const IrisProps& Props) {
 // their ancestor.
 template <typename BoxLikeBuilder>
 void BuildAndAttachChildren(BoxLikeBuilder& Builder, const Component& Node, const BuildContext& Context,
-                             const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags,
+                             const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                              StyleMatchStats* Stats) {
     for (const Component& Child : Node.Children) {
         if (std::unique_ptr<WidgetBase> ChildWidget = BuildWidgetTreeInternal(
-                Child, Context, &ThisStyleElement, /*IsComponentRoot=*/false, OutTags, Stats)) {
+                Child, Context, &ThisStyleElement, /*IsComponentRoot=*/false, OutTags, OutRefs, Stats)) {
             Builder.child(std::move(ChildWidget));
         }
     }
 }
 
 std::unique_ptr<WidgetBase> BuildFrame(const Component& Node, const BuildContext& Context,
-                                        const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags,
+                                        const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                                         StyleMatchStats* Stats) {
     Box::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
-    BuildAndAttachChildren(Builder, Node, Context, ThisStyleElement, OutTags, Stats);
+    BuildAndAttachChildren(Builder, Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
     return Builder.build();
 }
 
@@ -245,22 +258,22 @@ std::unique_ptr<WidgetBase> BuildFrame(const Component& Node, const BuildContext
 // is a public field on `Box`, not something `Box::Builder` exposes — there's no
 // `layout()` Builder method to chain, so it's set directly on the built widget.
 std::unique_ptr<WidgetBase> BuildGrid(const Component& Node, const BuildContext& Context,
-                                       const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags,
+                                       const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                                        StyleMatchStats* Stats) {
     Box::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
-    BuildAndAttachChildren(Builder, Node, Context, ThisStyleElement, OutTags, Stats);
+    BuildAndAttachChildren(Builder, Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
     std::unique_ptr<Box> Built = Builder.build();
     Built->Layout = Penumbra::Widgets::LayoutMode::HorizontalStack;
     return Built;
 }
 
 std::unique_ptr<WidgetBase> BuildInline(const Component& Node, const BuildContext& Context,
-                                         const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags,
+                                         const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                                          StyleMatchStats* Stats) {
     InlineContainer::Builder Builder;
     ApplySharedProps(Builder, Node.Props);
-    BuildAndAttachChildren(Builder, Node, Context, ThisStyleElement, OutTags, Stats);
+    BuildAndAttachChildren(Builder, Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
     return Builder.build();
 }
 
@@ -336,7 +349,7 @@ std::unique_ptr<WidgetBase> BuildIcon(const Component& Node, const BuildContext&
 // gives its shared props. wheelStep maps onto WheelStepLogical, the one dedicated field
 // this widget has.
 std::unique_ptr<WidgetBase> BuildScroll(const Component& Node, const BuildContext& Context,
-                                        const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags,
+                                        const WalkerStyleElement& ThisStyleElement, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                                         StyleMatchStats* Stats) {
     auto Built = std::make_unique<ScrollablePanel>();
     ApplySharedPropsToWidget(*Built, Node.Props);
@@ -345,7 +358,7 @@ std::unique_ptr<WidgetBase> BuildScroll(const Component& Node, const BuildContex
     }
     for (const Component& Child : Node.Children) {
         if (std::unique_ptr<WidgetBase> ChildWidget = BuildWidgetTreeInternal(
-                Child, Context, &ThisStyleElement, /*IsComponentRoot=*/false, OutTags, Stats)) {
+                Child, Context, &ThisStyleElement, /*IsComponentRoot=*/false, OutTags, OutRefs, Stats)) {
             Built->AddChild(std::move(ChildWidget));
         }
     }
@@ -380,7 +393,7 @@ std::unique_ptr<WidgetBase> BuildInput(const Component& Node, const BuildContext
 
 std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const BuildContext& Context,
                                                      const WalkerStyleElement* ParentStyleElement,
-                                                     bool IsComponentRoot, PrimitiveTagMap* OutTags,
+                                                     bool IsComponentRoot, PrimitiveTagMap* OutTags, RefMap* OutRefs,
                                                      StyleMatchStats* Stats) {
     // None/Slot build to nullptr with no widget at all -- nothing to construct a style
     // target for, same "no widget here" treatment BuildWidgetTree's own doc comment
@@ -396,13 +409,13 @@ std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const
     std::unique_ptr<WidgetBase> Built;
     switch (Node.Tag) {
         case IrisElementTag::Frame:
-            Built = BuildFrame(Node, Context, ThisStyleElement, OutTags, Stats);
+            Built = BuildFrame(Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
             break;
         case IrisElementTag::Grid:
-            Built = BuildGrid(Node, Context, ThisStyleElement, OutTags, Stats);
+            Built = BuildGrid(Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
             break;
         case IrisElementTag::Inline:
-            Built = BuildInline(Node, Context, ThisStyleElement, OutTags, Stats);
+            Built = BuildInline(Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
             break;
         case IrisElementTag::Image:
             Built = BuildImage(Node, Context);
@@ -414,7 +427,7 @@ std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const
             Built = BuildText(Node, Context);
             break;
         case IrisElementTag::Scroll:
-            Built = BuildScroll(Node, Context, ThisStyleElement, OutTags, Stats);
+            Built = BuildScroll(Node, Context, ThisStyleElement, OutTags, OutRefs, Stats);
             break;
         case IrisElementTag::Input:
             Built = BuildInput(Node, Context);
@@ -442,16 +455,25 @@ std::unique_ptr<WidgetBase> BuildWidgetTreeInternal(const Component& Node, const
         (*OutTags)[Built.get()] = LustreTag;
     }
 
+    // Same "record at the one point every built widget funnels through" reasoning as
+    // OutTags above -- Node.Ref is only reachable here, not from the built WidgetBase
+    // tree PenumbraWidgetAdapter.cpp's wrap step sees later.
+    if (Built && OutRefs != nullptr) {
+        if (const auto RefName = GetRefName(Node)) {
+            (*OutRefs)[*RefName] = Built.get();
+        }
+    }
+
     return Built;
 }
 
 } // namespace
 
 std::unique_ptr<WidgetBase> BuildWidgetTree(const Component& Node, const BuildContext& Context,
-                                             PrimitiveTagMap* OutTags) {
+                                             PrimitiveTagMap* OutTags, RefMap* OutRefs) {
     StyleMatchStats Stats;
-    std::unique_ptr<WidgetBase> Built =
-        BuildWidgetTreeInternal(Node, Context, /*ParentStyleElement=*/nullptr, /*IsComponentRoot=*/true, OutTags, &Stats);
+    std::unique_ptr<WidgetBase> Built = BuildWidgetTreeInternal(
+        Node, Context, /*ParentStyleElement=*/nullptr, /*IsComponentRoot=*/true, OutTags, OutRefs, &Stats);
 #ifndef NDEBUG
     // docs/build_context_style_mismatch_gap.md: every classed node resolved
     // nothing at all from Context.Style -- a near-certain sign the wrong

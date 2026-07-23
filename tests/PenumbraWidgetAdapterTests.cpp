@@ -158,6 +158,52 @@ void TestSignalDrivesRealPenumbraTreeThroughFullStack() {
     Expect(true, "Signal -> Tick -> SlotState -> Reconciler -> PenumbraWidget -> real Penumbra Box runs end to end");
 }
 
+void TestGetByRefFindsARefTaggedDescendant() {
+    std::vector<Component> Inner;
+    Component               InnerFrame = MakeFrame("child");
+    InnerFrame.Ref = IrisPropValue{std::string("target")};
+    Inner.push_back(std::move(InnerFrame));
+    const Component Root = MakeFrame("parent", std::move(Inner));
+
+    const iris::MountFn             Mount = MakeMountFn(BuildContext{});
+    std::unique_ptr<Umbra::IWidget> Wrapped = Mount(Root);
+
+    auto*            AsPenumbra = dynamic_cast<PenumbraWidget*>(Wrapped.get());
+    Umbra::IWidget*   Found = AsPenumbra != nullptr ? AsPenumbra->GetByRef("target") : nullptr;
+    Expect(Found != nullptr, "GetByRef finds the ref-tagged descendant");
+
+    auto* FoundAsPenumbra = dynamic_cast<PenumbraWidget*>(Found);
+    auto* FoundAsBox = FoundAsPenumbra != nullptr ? dynamic_cast<Box*>(FoundAsPenumbra->RawWidget()) : nullptr;
+    Expect(FoundAsBox != nullptr && FoundAsBox->ClassName == "child",
+           "the found widget is really the ref-tagged child, not some other node");
+    Expect(Wrapped->GetChildAt(0) == Found, "GetByRef's result is the same wrapper identity GetChildAt(0) returns");
+}
+
+void TestGetByRefOnAnUnknownNameReturnsNull() {
+    const iris::MountFn             Mount = MakeMountFn(BuildContext{});
+    std::unique_ptr<Umbra::IWidget> Wrapped = Mount(MakeFrame("root"));
+
+    auto* AsPenumbra = dynamic_cast<PenumbraWidget*>(Wrapped.get());
+    Expect(AsPenumbra != nullptr && AsPenumbra->GetByRef("does-not-exist") == nullptr,
+           "an unknown ref name returns nullptr, not a crash");
+}
+
+void TestGetByRefIsCallableFromANonRootWrapper() {
+    std::vector<Component> Inner;
+    Component               InnerFrame = MakeFrame("child");
+    InnerFrame.Ref = IrisPropValue{std::string("target")};
+    Inner.push_back(std::move(InnerFrame));
+    const Component Root = MakeFrame("parent", std::move(Inner));
+
+    const iris::MountFn             Mount = MakeMountFn(BuildContext{});
+    std::unique_ptr<Umbra::IWidget> Wrapped = Mount(Root);
+
+    Umbra::IWidget* Child = Wrapped->GetChildAt(0);
+    auto*            ChildAsPenumbra = dynamic_cast<PenumbraWidget*>(Child);
+    Expect(ChildAsPenumbra != nullptr && ChildAsPenumbra->GetByRef("target") == Child,
+           "GetByRef works from a non-root wrapper too -- it walks up to the mount root's own registry");
+}
+
 } // namespace
 
 void RunPenumbraWidgetAdapterTests() {
@@ -167,4 +213,7 @@ void RunPenumbraWidgetAdapterTests() {
     TestReconcilerUpdatesRealWidgetTreeInPlace();
     TestReconcilerAddsRealChildToRealParentBox();
     TestSignalDrivesRealPenumbraTreeThroughFullStack();
+    TestGetByRefFindsARefTaggedDescendant();
+    TestGetByRefOnAnUnknownNameReturnsNull();
+    TestGetByRefIsCallableFromANonRootWrapper();
 }

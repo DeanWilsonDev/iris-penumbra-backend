@@ -6,6 +6,89 @@
 > durable record).
 > Last updated: 2026-07-23.
 
+## Done this session (2026-07-23, third pass): shared `.lustre`-file-loading helper
+
+Implemented the `LoadStylesheetFromFile` helper this doc had specced out (previous
+revision, below the fold in git history): `PenumbraUiBackend/Lustre/StylesheetLoader.h`
++ `.cpp`, added to the existing `penumbra_ui_backend_lustre` target (no new CMake
+target — same rationale as `StyleApplier`/`StyleResolution` already sharing it, this
+is more of the same "Lustre bridge" surface). Does exactly the `ifstream`/
+`ostringstream`/named-`std::string`/`Lustre::Parser::Parse()` sequence every consumer
+this doc surveyed (`lens_toggle.cpp:40-67` et al.) hand-rolled, logging to stderr
+(each line prefixed with the caller-supplied `LabelForErrors`) on either an unopenable
+file or a parse error.
+
+One correction versus the original spec: `Parser::Parse()` (`vendor/lustre/src/Lustre/
+Parser.cpp`) always populates `ParseResult::Sheet`, even when `Errors` is non-empty —
+it hands back the (possibly partial) tree regardless, so a caller can report every
+error at once rather than stop at the first. The spec's `result.Sheet.has_value()`
+check (copied from the hand-rolled call sites, which all had the same latent
+assumption) is therefore not what actually gates the empty-`Stylesheet{}` fallback in
+practice; only the can't-open-file path reliably hits it. Documented this on both the
+header and the implementation rather than silently diverging from the ask, and added
+`TestFileWithParseErrorsStillReturnsWithoutCrashing` to `tests/
+StylesheetLoaderTests.cpp` to pin the actual (not assumed) behavior down.
+
+Also `TestValidFileParsesIntoAPopulatedStylesheet`, `TestMissingFileReturnsAnEmptyStylesheet`.
+New test file wired into `CMakeLists.txt`'s `penumbra_ui_backend_tests` target and
+`tests/WalkerTests.cpp`'s `main()`. Full build + `penumbra_ui_backend_tests` (0
+failures) + `test_lustre` (27 passed) + `test_iris` (124 passed) clean.
+
+**What this unblocks**: `pharos-proto`'s six call sites (`lens_toggle.cpp`,
+`json_path_field.cpp`, `load_button.cpp`, `color_filter_dropdown.cpp` ×2,
+`inspector_panel.cpp` ×2) can each replace their ~25-line hand-rolled loader with one
+call to `PenumbraUiBackend::Lustre::LoadStylesheetFromFile`. That migration is
+`pharos-proto`'s own follow-up, nothing further needed here.
+
+## Done this session (2026-07-23, fourth pass): `GetByRef` lookup on a mounted tree
+
+`iris` landed its half (pin `c92388b` → `7830955`, "Add ref prop and iris_compile_directory
+CMake helper"): `Component`/`ElementNode` each gained a `Ref` field paralleling `Key` exactly
+(`std::optional<IrisPropValue>`), threaded through parsing/codegen/validation but deliberately
+kept out of the reconciler's identity matching (`Reconciler.cpp` stays `Key`-only — `ref`
+carries no reconciler meaning). No nested-submodule re-init needed this time (`libs/amanuensis`/
+`libs/cimmerian`/`libs/umbra-interfaces` all unchanged). `iris`'s own doc explicitly left the
+mount-result registry lookup as this repo's follow-up, not touching `MountFn`'s return type
+(`Iris/SlotRuntime.h`'s `MountFn` still returns a plain `std::unique_ptr<Umbra::IWidget>`) — so
+the lookup below is exposed as a `PenumbraWidget`-specific method, the same way
+`GetPrimitiveTag()` already is, rather than a new `iris::MountResult` type.
+
+Implemented the "collect ref-tagged nodes during the recursive walk" half this doc had
+specced out:
+
+1. **`Walker.h`/`Walker.cpp`**: new `RefMap` type (`unordered_map<std::string,
+   WidgetBase*>`, ref name -> built widget), mirroring `PrimitiveTagMap`'s own "optional
+   out-param, populated at the one point every built widget funnels through" convention
+   exactly. `BuildWidgetTree` gained a trailing `RefMap* OutRefs = nullptr` parameter,
+   threaded through every internal helper (`BuildWidgetTreeInternal`,
+   `BuildAndAttachChildren`, `BuildFrame`/`BuildGrid`/`BuildInline`/`BuildScroll`) right
+   alongside `OutTags`, since it needs to reach the same recursion point.
+2. **`PenumbraWidgetAdapter.h`/`.cpp`**: `WrapExistingTree` gained a trailing `const
+   RefMap* Refs = nullptr` parameter. Since `RefMap` is keyed by ref name but the wrap
+   walk matches by raw `WidgetBase*` pointer as it constructs each wrapper, it inverts
+   `Refs` into a local `WidgetBase* -> name` map once, then threads that (plus a
+   `RegistryRoot` pointer) through `AdoptChildrenFromRawTree`'s existing recursion. The
+   resulting `ref name -> PenumbraWidget*` registry lives only on the mount's root
+   wrapper (`Parent_ == nullptr`) — the new `PenumbraWidget::GetByRef(std::string_view)`
+   method walks up to that root via the existing `Parent_` chain first, so it's callable
+   from any wrapper in the tree, not just the one `MakeMountFn` hands back. `MakeMountFn`
+   now builds a `RefMap` alongside its existing `PrimitiveTagMap` and threads both
+   through.
+
+New regression coverage: `tests/WalkerTests.cpp` (`TestRefTaggedNodeIsRecordedInOutRefs`,
+`TestNoRefLeavesOutRefsEmpty`) and `tests/PenumbraWidgetAdapterTests.cpp`
+(`TestGetByRefFindsARefTaggedDescendant`, `TestGetByRefOnAnUnknownNameReturnsNull`,
+`TestGetByRefIsCallableFromANonRootWrapper`). Full build + `penumbra_ui_backend_tests` (0
+failures) + `test_lustre` (27 passed) + `test_iris` (129 passed, up from 124 — `iris`'s own
+new `ref`-prop tests) clean.
+
+**What this unblocks**: `pharos-proto`'s `lens_toggle.cpp:108-122` and
+`inspector_panel.cpp`'s `buildInspectorRow` (116-177) can each replace their hand-walked
+`GetChildAt(index)` chains — kept in sync with the `.iris` file's child order only by
+convention, with no compiler error on drift — with `ref="..."` in the `.iris` file plus one
+`GetByRef("...")` call on the mounted wrapper. That migration is `pharos-proto`'s own
+follow-up, nothing further needed here.
+
 ## Done this session (2026-07-23, second pass): `<Icon>` color wired through `StyleApplier`
 
 Bumped the `vendor/penumbra` pin `7fad4dc` → `2f21c55` ("Add IconColor param

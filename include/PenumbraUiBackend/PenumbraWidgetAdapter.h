@@ -11,6 +11,9 @@
 #include <SDL3/SDL.h>
 
 #include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace PenumbraUiBackend {
@@ -92,6 +95,16 @@ public:
     const std::string& GetPrimitiveTag() const { return PrimitiveTag_; }
     void                SetPrimitiveTag(std::string Tag) { PrimitiveTag_ = std::move(Tag); }
 
+    // Looks up a `ref`-tagged descendant by ref name (docs/next_steps.md's "GetByRef
+    // lookup on a mounted tree" ask) -- nullptr if no node in this mount carried that
+    // `ref`, or `WrapExistingTree` wasn't given a `RefMap` to populate it from in the
+    // first place (same "optional, absent means untouched" convention as
+    // GetPrimitiveTag()'s own PrimitiveTagMap). The registry itself lives only on the
+    // mount root (built once per `WrapExistingTree` call, not duplicated onto every
+    // wrapper) -- callable from any wrapper in the tree regardless, since this walks up
+    // to the root via GetParent() first.
+    Umbra::IWidget* GetByRef(std::string_view Ref) const;
+
 private:
     // Non-owning (attached) construction — used for every non-root node when wrapping
     // an already-built subtree (`WrapExistingTree`).
@@ -100,10 +113,13 @@ private:
     // Recursively wraps every child already present under RawWidget() (i.e. real
     // Penumbra children `BuildWidgetTree` already built) into attached `PenumbraWidget`
     // wrappers, appended to Children_. Called once, by `WrapExistingTree`, on the root
-    // wrapper it just constructed.
+    // wrapper it just constructed. `ReverseRefs`/`RegistryRoot` (either both null or both
+    // set together) are `WrapExistingTree`'s own ref bookkeeping -- see its comment.
     void AdoptChildrenFromRawTree(Penumbra::Backends::IImageBackend* ImageBackend, SDL_Renderer* SdlRenderer,
                                    const ::Lustre::StylesheetSet* Sheets, const Lustre::IStyleApplier* StyleApplier,
-                                   const PrimitiveTagMap* Tags);
+                                   const PrimitiveTagMap* Tags,
+                                   const std::unordered_map<const Penumbra::Widgets::WidgetBase*, std::string>* ReverseRefs,
+                                   PenumbraWidget* RegistryRoot);
 
     std::unique_ptr<Penumbra::Widgets::WidgetBase> OwnedWidget_;
     Penumbra::Widgets::WidgetBase*                  AttachedWidget_{nullptr};
@@ -117,10 +133,15 @@ private:
     const ::Lustre::StylesheetSet* Sheets_{nullptr};
     const Lustre::IStyleApplier*    StyleApplier_{nullptr};
 
+    // Only ever non-empty on a mount's root wrapper (Parent_ == nullptr) -- see
+    // GetByRef()'s own comment for why a non-root wrapper still works transparently.
+    std::unordered_map<std::string, PenumbraWidget*> RefRegistry_;
+
     friend std::unique_ptr<PenumbraWidget> WrapExistingTree(std::unique_ptr<Penumbra::Widgets::WidgetBase>,
                                                               Penumbra::Backends::IImageBackend*, SDL_Renderer*,
                                                               const ::Lustre::StylesheetSet*,
-                                                              const Lustre::IStyleApplier*, const PrimitiveTagMap*);
+                                                              const Lustre::IStyleApplier*, const PrimitiveTagMap*,
+                                                              const RefMap*);
 };
 
 // Wraps an already-built Penumbra widget subtree (e.g. `BuildWidgetTree`'s output) into
@@ -133,12 +154,17 @@ private:
 // the subtree can re-resolve and re-apply its Lustre style (`ApplyPropDiff` below). `Tags`
 // (also optional), if the caller built one via `BuildWidgetTree`'s own `OutTags`
 // parameter, seeds each wrapper's `GetPrimitiveTag()` with the real originating tag.
+// `Refs` (also optional), if the caller built one via `BuildWidgetTree`'s own `OutRefs`
+// parameter, seeds the returned root wrapper's `GetByRef()` registry -- inverted from
+// `Refs`' own (ref name -> raw WidgetBase*) shape to (raw WidgetBase* -> ref name) once
+// here, then matched against each wrapper as this walk constructs it.
 std::unique_ptr<PenumbraWidget> WrapExistingTree(std::unique_ptr<Penumbra::Widgets::WidgetBase> Root,
                                                   Penumbra::Backends::IImageBackend*             ImageBackend,
                                                   SDL_Renderer*                                   SdlRenderer,
                                                   const ::Lustre::StylesheetSet* Sheets = nullptr,
                                                   const Lustre::IStyleApplier*    StyleApplier = nullptr,
-                                                  const PrimitiveTagMap*          Tags = nullptr);
+                                                  const PrimitiveTagMap*          Tags = nullptr,
+                                                  const RefMap*                   Refs = nullptr);
 
 // Builds an `iris::MountFn` (`Iris/SlotRuntime.h`, in the `iris` repo) combining Stage
 // 2's `BuildWidgetTree` with `WrapExistingTree` above — what Stage 3's reconciler calls

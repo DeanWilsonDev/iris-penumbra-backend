@@ -40,7 +40,8 @@ add_subdirectory(vendor/lustre)
 # ---------------------------------------------------------------------------
 add_library(penumbra_ui_backend_lustre STATIC
     src/PenumbraUiBackend/Lustre/StyleApplier.cpp
-    src/PenumbraUiBackend/Lustre/StyleResolution.cpp)
+    src/PenumbraUiBackend/Lustre/StyleResolution.cpp
+    src/PenumbraUiBackend/Lustre/StylesheetLoader.cpp)
 
 target_include_directories(penumbra_ui_backend_lustre PUBLIC include)
 target_compile_features(penumbra_ui_backend_lustre PUBLIC cxx_std_23)
@@ -76,7 +77,8 @@ add_executable(penumbra_ui_backend_tests
     tests/SlotWiringTests.cpp
     tests/LustreStyleApplierTests.cpp
     tests/StyleWiringTests.cpp
-    tests/StyleMismatchDiagnosticTests.cpp)
+    tests/StyleMismatchDiagnosticTests.cpp
+    tests/StylesheetLoaderTests.cpp)
 
 target_link_libraries(penumbra_ui_backend_tests PRIVATE penumbra_ui_backend penumbra_ui_backend_lustre)
 set_target_properties(penumbra_ui_backend_tests PROPERTIES

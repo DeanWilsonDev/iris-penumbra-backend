@@ -32,6 +32,17 @@ namespace PenumbraUiBackend {
 // unreliable for Frame/Grid specifically).
 using PrimitiveTagMap = std::unordered_map<const Penumbra::Widgets::WidgetBase*, std::string>;
 
+// Maps a `ref`-tagged node's ref name (docs/next_steps.md's "GetByRef lookup on a
+// mounted tree" ask -- `iris`'s own `Component::Ref` field, `vendor/iris/include/
+// Iris/Component.h`) to the widget built from it. Same "optional, populated only when
+// a caller passes a non-null map" convention as PrimitiveTagMap above, and populated at
+// exactly the same point in BuildWidgetTreeInternal's recursion for the same reason: by
+// the time PenumbraWidgetAdapter.cpp wraps the already-built tree, the originating
+// `Component` nodes (and their `Ref` fields) are gone. PenumbraWidgetAdapter.cpp's
+// WrapExistingTree consumes this to populate PenumbraWidget::GetByRef, keyed on the
+// same ref name.
+using RefMap = std::unordered_map<std::string, Penumbra::Widgets::WidgetBase*>;
+
 // Resources BuildWidgetTree needs beyond what an Component tree itself carries.
 // Penumbra's own primitives don't take these through their fluent Builder: `Label`'s
 // `FontBackend`/`Font` are plain public fields set after construction (there's no
@@ -103,8 +114,17 @@ struct BuildContext {
 // When OutTags is non-null, every built widget's raw pointer is recorded there against
 // its real Lustre primitive tag -- see PrimitiveTagMap's own comment above. Left null
 // (the default), behaves exactly as before this parameter existed.
+//
+// When OutRefs is non-null, every node carrying a `ref` prop has its built widget's raw
+// pointer recorded there against that ref name -- see RefMap's own comment above. Left
+// null (the default), behaves exactly as before this parameter existed. A `ref` whose
+// value isn't a plain string (shouldn't happen via real `.iris` codegen, `Component.h`'s
+// `Ref` field always carries the string an `IIFE` wrapper set it from) is silently
+// skipped, same "malformed input is simply not recorded" tolerance the rest of this
+// walker already has for e.g. a wrongly-typed `class` prop.
 std::unique_ptr<Penumbra::Widgets::WidgetBase> BuildWidgetTree(const Iris::Component& Node,
                                                                  const BuildContext&        Context,
-                                                                 PrimitiveTagMap*           OutTags = nullptr);
+                                                                 PrimitiveTagMap*           OutTags = nullptr,
+                                                                 RefMap*                    OutRefs = nullptr);
 
 } // namespace PenumbraUiBackend

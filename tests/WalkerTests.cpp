@@ -295,6 +295,32 @@ void TestNestedTreeBuildsRecursively() {
     Expect(AsLabel != nullptr && AsLabel->Text == "42/100", "the nested Label is reached at the correct depth");
 }
 
+void TestRefTaggedNodeIsRecordedInOutRefs() {
+    std::vector<Component> Children;
+    Component               InnerText = MakeNode(IrisElementTag::Text);
+    InnerText.Ref = IrisPropValue{std::string("trigger-icon")};
+    Children.push_back(std::move(InnerText));
+
+    const auto Node = MakeNode(IrisElementTag::Frame, {}, std::move(Children));
+
+    PenumbraUiBackend::RefMap Refs;
+    const auto                Built = BuildWidgetTree(Node, BuildContext{}, /*OutTags=*/nullptr, &Refs);
+
+    Expect(Refs.size() == 1, "exactly one ref-tagged node was recorded");
+    Expect(Built != nullptr && Built->GetChildCount() == 1 && Refs.count("trigger-icon") == 1 &&
+               Refs.at("trigger-icon") == Built->GetChildAt(0),
+           "the recorded pointer is the real built widget for the ref-tagged node, not some other widget");
+}
+
+void TestNoRefLeavesOutRefsEmpty() {
+    const auto Node = MakeNode(IrisElementTag::Frame);
+
+    PenumbraUiBackend::RefMap Refs;
+    BuildWidgetTree(Node, BuildContext{}, /*OutTags=*/nullptr, &Refs);
+
+    Expect(Refs.empty(), "a tree with no `ref` props records nothing, even when OutRefs is provided");
+}
+
 } // namespace
 
 void RunWalkerTests() {
@@ -317,6 +343,8 @@ void RunWalkerTests() {
     TestInputPicksUpFocusAndClipboardFromBuildContext();
     TestInputOnTextChangeReachesTextInputOnTextChanged();
     TestNestedTreeBuildsRecursively();
+    TestRefTaggedNodeIsRecordedInOutRefs();
+    TestNoRefLeavesOutRefsEmpty();
 }
 
 void RunPenumbraWidgetAdapterTests();      // tests/PenumbraWidgetAdapterTests.cpp
@@ -324,6 +352,7 @@ void RunSlotWiringTests();                 // tests/SlotWiringTests.cpp
 void RunLustreStyleApplierTests();         // tests/LustreStyleApplierTests.cpp
 void RunStyleWiringTests();                // tests/StyleWiringTests.cpp
 void RunStyleMismatchDiagnosticTests();    // tests/StyleMismatchDiagnosticTests.cpp
+void RunStylesheetLoaderTests();           // tests/StylesheetLoaderTests.cpp
 
 int main() {
     RunWalkerTests();
@@ -332,6 +361,7 @@ int main() {
     RunLustreStyleApplierTests();
     RunStyleWiringTests();
     RunStyleMismatchDiagnosticTests();
+    RunStylesheetLoaderTests();
 
     std::printf("\n%d failure(s)\n", Failures);
     return Failures == 0 ? 0 : 1;
